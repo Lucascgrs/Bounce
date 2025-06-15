@@ -26,11 +26,12 @@ class Cercle:
         rayon_grand = self.rayon * scale_factor
         taille_surface = rayon_grand * 2
 
+        # Création de la surface temporaire avec canal alpha
         temp_surface = pygame.Surface((taille_surface, taille_surface), pygame.SRCALPHA)
         centre = (rayon_grand, rayon_grand)
 
         # Dessin du cercle sur la surface temporaire
-        pygame.draw.circle(temp_surface, couleur, centre, rayon_grand, self.epaisseur * scale_factor)
+        pygame.draw.circle(temp_surface, (*couleur, 255), centre, rayon_grand, self.epaisseur * scale_factor)
 
         # Réduction de la surface pour un effet lissé
         cercle_lisse = pygame.transform.smoothscale(temp_surface, (self.rayon * 2, self.rayon * 2))

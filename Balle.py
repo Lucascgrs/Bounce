@@ -4,19 +4,25 @@ import numpy as np
 
 
 class Balle:
-    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0), gravite=0.1):
+    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0),
+                 gravite=0.1):
         self.taille = taille
         self.image_path = image
         self.couleur = couleur
         self.contour = contour
         self.position = list(position)
         self.vitesse = list(vitesse)
-        self.gravite = gravite * 60**2
-        self.direction = (1, 1)
+        # Correction de la gravité pour être indépendante du FPS
+        self.gravite = gravite * 3600  # Ajusté pour une meilleure expérience
+        self.direction = [1, 1]
 
         if self.image_path:
-            self.image = pygame.image.load(self.image_path)
-            self.image = pygame.transform.scale(self.image, (taille * 2, taille * 2))
+            try:
+                self.image = pygame.image.load(self.image_path)
+                self.image = pygame.transform.scale(self.image, (taille * 2, taille * 2))
+            except pygame.error:
+                print(f"Erreur lors du chargement de l'image: {self.image_path}")
+                self.image = None
         else:
             self.image = None
 
@@ -27,24 +33,47 @@ class Balle:
         self.position[0] += self.vitesse[0] * dt
         self.position[1] += self.vitesse[1] * dt
 
+    def collision_avec_balle(self, autre_balle):
+        # Calcul de la distance entre les centres des balles
+        dx = autre_balle.position[0] - self.position[0]
+        dy = autre_balle.position[1] - self.position[1]
+        distance = np.sqrt(dx * dx + dy * dy)
+
+        # Si collision
+        if distance < (self.taille + autre_balle.taille):
+            # Normalisation du vecteur de collision
+            if distance != 0:
+                nx = dx / distance
+                ny = dy / distance
+            else:
+                nx, ny = 1, 0
+
+            # Calcul des vitesses relatives
+            vx = self.vitesse[0] - autre_balle.vitesse[0]
+            vy = self.vitesse[1] - autre_balle.vitesse[1]
+
+            # Produit scalaire
+            produit_scalaire = vx * nx + vy * ny
+
+            # Si les balles se rapprochent
+            if produit_scalaire < 0:
+                # Coefficient de restitution (élasticité de la collision)
+                e = 0.8
+
+                # Application de l'impulsion
+                j = -(1 + e) * produit_scalaire
+                self.vitesse[0] -= j * nx
+                self.vitesse[1] -= j * ny
+                autre_balle.vitesse[0] += j * nx
+                autre_balle.vitesse[1] += j * ny
+
     def afficher(self, surface):
         if self.image:
-            # S'assurer que l'image est en 32 bits avec alpha
-            if self.image.get_bitsize() not in (24, 32):
-                self.image = self.image.convert_alpha()
-
-            image_redim = pygame.transform.smoothscale(self.image, (self.taille * 2, self.taille * 2))
-
-            masque = pygame.Surface((self.taille * 2, self.taille * 2), pygame.SRCALPHA)
-            pygame.draw.circle(masque, (255, 255, 255, 255), (self.taille, self.taille), self.taille)
-
-            image_ronde = image_redim.copy()
-            image_ronde.blit(masque, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-
-            rect = image_ronde.get_rect(center=self.position)
-            surface.blit(image_ronde, rect)
+            surface.blit(self.image, (self.position[0] - self.taille, self.position[1] - self.taille))
         else:
-            pygame.draw.circle(surface, self.couleur, self.position, self.taille)
+            pygame.draw.circle(surface, self.couleur, (int(self.position[0]), int(self.position[1])), self.taille)
+            if self.contour:
+                pygame.draw.circle(surface, self.contour, (int(self.position[0]), int(self.position[1])), self.taille, 2)
 
     def rebondir(self, cercle, facteur_vitesse=1.01):
         centre_cercle = cercle.position
@@ -75,27 +104,3 @@ class Balle:
 
             # Repositionner la balle juste à l'intérieur du cercle
             self.position = list(centre_cercle + normal * (rayon_cercle - self.taille))
-
-    def collision_avec_balle(self, autre_balle, coef_restitution=0.02):
-        dx = self.position[0] - autre_balle.position[0]
-        dy = self.position[1] - autre_balle.position[1]
-        distance = np.sqrt(dx ** 2 + dy ** 2)
-
-        if distance < self.taille + autre_balle.taille:
-            normal = np.array([dx, dy]) / distance if distance != 0 else np.array([1.0, 0.0])
-
-            v1 = np.array(self.vitesse)
-            v2 = np.array(autre_balle.vitesse)
-            vitesse_rel = v1 - v2
-            vitesse_normale = np.dot(vitesse_rel, normal)
-
-            if vitesse_normale < 0:
-                # application du coefficient de restitution ici
-                impulse = (1 + coef_restitution) * vitesse_normale
-                self.vitesse = (v1 - impulse * normal).tolist()
-                autre_balle.vitesse = (v2 + impulse * normal).tolist()
-
-            overlap = self.taille + autre_balle.taille - distance
-            correction = normal * (overlap / 2)
-            self.position += correction
-            autre_balle.position -= correction
