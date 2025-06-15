@@ -1,4 +1,6 @@
 # jeu.py
+import os
+
 from Balle import Balle
 from Screen import Screen
 from Cercle import Cercle
@@ -16,7 +18,7 @@ class Jeu:
         self.fps = fps
         self.balles = []
         self.cercles = []
-        self.gestionnaire_images = GestionnaireImages("C:\\Users\\lucas\\PycharmProjects\\PROJECT\\TikTok\\Images")
+        self.gestionnaire_images = GestionnaireImages(os.getcwd() + "\\Images")
 
         # Calcul du centre de l'écran
         centre_x = taille_ecran[0] // 2
