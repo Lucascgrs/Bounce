@@ -130,32 +130,33 @@ class Balle:
             if self.contour:
                 pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])), self.taille, self.contour[1])
 
-    def rebondir(self, cercle, facteur_vitesse=1.01):
-        centre_cercle = cercle.position
+    def rebondir(self, cercle):
+        centre_cercle = np.array(cercle.position)
         rayon_cercle = cercle.rayon
 
-        direction_x = self.position[0] - centre_cercle[0]
-        direction_y = self.position[1] - centre_cercle[1]
-        direction = (direction_x, direction_y)
-
+        position = np.array(self.position)
+        direction = position - centre_cercle
         distance = np.linalg.norm(direction)
 
-        epaisseur_contour = self.contour[1] if self.contour else 0
-        rayon_visuel_balle = self.taille + epaisseur_contour / 2
+        if distance == 0:
+            direction = np.array([1.0, 0.0])
+            distance = 1.0
 
-        if distance + rayon_visuel_balle >= rayon_cercle:
+        normal = direction / distance
 
+        if distance + self.taille >= rayon_cercle:
             cercle.life -= 1
 
-            if distance == 0:
-                direction = np.array([1.0, 0.0])  # direction arbitraire pour éviter division par 0
-                distance = 1.0
+            # Calcul du point de collision
+            point_collision = centre_cercle + normal * rayon_cercle
 
-            normal = direction / distance
-
-            # Calcul du rebond (réflexion du vecteur vitesse par rapport à la normale)
             vitesse_vec = np.array(self.vitesse, dtype=float)
-            self.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal * facteur_vitesse)
+            self.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal)
 
             # Repositionner la balle juste à l'intérieur du cercle
             self.position = list(centre_cercle + normal * (rayon_cercle - self.taille))
+
+            # Retourner le point de collision
+            return list(point_collision)
+
+        return None
