@@ -4,8 +4,7 @@ import numpy as np
 
 
 class Balle:
-    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0),
-                 gravite=0.1):
+    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0), gravite=0.1):
         self.taille = taille
         self.image_path = image
         self.couleur = couleur

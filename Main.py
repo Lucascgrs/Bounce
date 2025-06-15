@@ -9,8 +9,7 @@ import random
 
 
 class Jeu:
-    def __init__(self, nb_balles=1, nb_cercles=1, taille_ecran=(800, 600), couleur_fond="black", titre="Balles",
-                 duree=30, fps=120, marge=10):
+    def __init__(self, nb_balles=1, nb_cercles=1, taille_ecran=(800, 600), couleur_fond="black", titre="Balles", duree=30, fps=120, marge=10):
         self.taille_ecran = taille_ecran
         self.couleur_fond = couleur_fond
         self.titre = titre
