@@ -24,28 +24,66 @@ class Cercle:
             self.angle_rotation += self.vitesse_rotation * dt
             self.angle_rotation = self.angle_rotation % 360  # Garder l'angle entre 0 et 360
 
-    def est_dans_ouverture(self, position_balle):
-        """Vérifie si une position est dans l'ouverture (partie invisible) de l'arc"""
+    def est_dans_ouverture(self, position_balle, rayon_balle=0):
+        """Vérifie si une balle est entièrement dans l'ouverture (partie invisible) de l'arc"""
         if self.angle_ouverture == 0:
             return False  # Pas d'ouverture pour un cercle complet
 
-        # Calculer l'angle de la balle par rapport au centre de l'arc
+        # Calculer l'angle du centre de la balle par rapport au centre de l'arc
         dx = position_balle[0] - self.position[0]
         dy = position_balle[1] - self.position[1]
-        angle_balle = math.degrees(math.atan2(dy, dx))
+        distance_centre = math.sqrt(dx * dx + dy * dy)
 
-        # Normaliser l'angle entre 0 et 360
-        angle_balle = (angle_balle + 360) % 360
+        if distance_centre == 0:
+            return False
+
+        angle_centre_balle = math.degrees(math.atan2(dy, dx))
+        angle_centre_balle = (angle_centre_balle + 360) % 360
+
+        # Calculer l'angle que couvre la balle depuis le centre du cercle
+        if rayon_balle > 0 and distance_centre > 0:
+            # Angle que couvre le rayon de la balle vu depuis le centre du cercle
+            angle_couverture_balle = math.degrees(math.asin(min(1.0, rayon_balle / distance_centre)))
+        else:
+            angle_couverture_balle = 0
 
         # Calculer les angles de début et fin de l'ouverture (partie invisible)
         angle_ouverture_debut = (self.angle_rotation - self.angle_ouverture / 2) % 360
         angle_ouverture_fin = (self.angle_rotation + self.angle_ouverture / 2) % 360
 
-        # Vérifier si l'angle de la balle est dans l'ouverture
-        if angle_ouverture_debut <= angle_ouverture_fin:
-            return angle_ouverture_debut <= angle_balle <= angle_ouverture_fin
-        else:  # L'ouverture traverse 0°
-            return angle_balle >= angle_ouverture_debut or angle_balle <= angle_ouverture_fin
+        # Calculer les angles extrêmes de la balle
+        angle_balle_min = (angle_centre_balle - angle_couverture_balle) % 360
+        angle_balle_max = (angle_centre_balle + angle_couverture_balle) % 360
+
+        # Fonction pour vérifier si un angle est dans l'ouverture
+        def angle_dans_ouverture(angle):
+            if angle_ouverture_debut <= angle_ouverture_fin:
+                return angle_ouverture_debut <= angle <= angle_ouverture_fin
+            else:  # L'ouverture traverse 0°
+                return angle >= angle_ouverture_debut or angle <= angle_ouverture_fin
+
+        # Vérifier si TOUTE la balle est dans l'ouverture
+        if angle_balle_min <= angle_balle_max:
+            # Cas normal : la balle ne traverse pas 0°
+            # Pour que toute la balle soit dans l'ouverture, les deux extrêmes doivent y être
+            return angle_dans_ouverture(angle_balle_min) and angle_dans_ouverture(angle_balle_max)
+        else:
+            # Cas où la balle traverse 0° : vérifier que tout l'arc couvert est dans l'ouverture
+            # On vérifie plusieurs points sur l'arc de la balle
+            points_a_verifier = 5
+            for i in range(points_a_verifier + 1):
+                if i == 0:
+                    angle_test = angle_balle_min
+                elif i == points_a_verifier:
+                    angle_test = angle_balle_max
+                else:
+                    # Points intermédiaires en traversant 0°
+                    angle_test = (angle_balle_min + (
+                                360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
+
+                if not angle_dans_ouverture(angle_test):
+                    return False
+            return True
 
     def afficher(self, surface):
         # Calcul de la proportion de vie restante (entre 0 et 1)

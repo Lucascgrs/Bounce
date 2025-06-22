@@ -129,34 +129,3 @@ class Balle:
                                self.taille)
             if self.contour:
                 pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])), self.taille, self.contour[1])
-
-    def rebondir(self, cercle):
-        centre_cercle = np.array(cercle.position)
-        rayon_cercle = cercle.rayon
-
-        position = np.array(self.position)
-        direction = position - centre_cercle
-        distance = np.linalg.norm(direction)
-
-        if distance == 0:
-            direction = np.array([1.0, 0.0])
-            distance = 1.0
-
-        normal = direction / distance
-
-        if distance + self.taille >= rayon_cercle:
-            cercle.life -= 1
-
-            # Calcul du point de collision
-            point_collision = centre_cercle + normal * rayon_cercle
-
-            vitesse_vec = np.array(self.vitesse, dtype=float)
-            self.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal)
-
-            # Repositionner la balle juste à l'intérieur du cercle
-            self.position = list(centre_cercle + normal * (rayon_cercle - self.taille))
-
-            # Retourner le point de collision
-            return list(point_collision)
-
-        return None

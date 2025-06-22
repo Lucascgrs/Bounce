@@ -60,7 +60,8 @@ class Jeu:
                 epaisseur=epaisseur,
                 angle_ouverture=angle_ouverture,
                 angle_rotation=angle_rotation_initial,
-                vitesse_rotation=vitesse_rotation
+                vitesse_rotation=vitesse_rotation,
+                life=40
             )
             self.cercles.append(arc)
             self.screen.ajouter_objet(arc)
@@ -106,7 +107,7 @@ class Jeu:
 
 if __name__ == "__main__":
     # Test 1 : Collision traditionnelle (rebond sur l'arc visible, pas dans l'ouverture)
-    jeu = Jeu(nb_balles=2, nb_cercles=2, duree=61, collision_sur_contact=True, brisure_dans_ouverture=False)
+    jeu = Jeu(nb_balles=2, nb_cercles=1, duree=61, collision_sur_contact=True, brisure_dans_ouverture=False)
 
     # Test 2 : Brisure dans l'ouverture (pas de rebond, brise quand traverse l'ouverture)
     # jeu = Jeu(nb_balles=2, nb_cercles=2, duree=61, collision_sur_contact=False, brisure_dans_ouverture=True)

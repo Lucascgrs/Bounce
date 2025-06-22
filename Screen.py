@@ -96,6 +96,62 @@ class Screen:
 
         pygame.quit()
 
+    def _est_entierement_dans_ouverture(self, balle, cercle):
+        """Vérifie si TOUTE la balle est dans l'ouverture"""
+        if cercle.angle_ouverture == 0:
+            return False
+
+        # Calculer l'angle du centre de la balle
+        dx = balle.position[0] - cercle.position[0]
+        dy = balle.position[1] - cercle.position[1]
+        distance_centre = math.sqrt(dx * dx + dy * dy)
+
+        if distance_centre == 0:
+            return False
+
+        angle_centre_balle = math.degrees(math.atan2(dy, dx))
+        angle_centre_balle = (angle_centre_balle + 360) % 360
+
+        # Calculer l'angle que couvre la balle depuis le centre du cercle
+        if balle.taille > 0 and distance_centre > 0:
+            angle_couverture_balle = math.degrees(math.asin(min(1.0, balle.taille / distance_centre)))
+        else:
+            angle_couverture_balle = 0
+
+        # Calculer les angles de l'ouverture
+        angle_ouverture_debut = (cercle.angle_rotation - cercle.angle_ouverture / 2) % 360
+        angle_ouverture_fin = (cercle.angle_rotation + cercle.angle_ouverture / 2) % 360
+
+        # Calculer les angles extrêmes de la balle
+        angle_balle_min = (angle_centre_balle - angle_couverture_balle) % 360
+        angle_balle_max = (angle_centre_balle + angle_couverture_balle) % 360
+
+        # Fonction pour vérifier si un angle est dans l'ouverture
+        def angle_dans_ouverture(angle):
+            if angle_ouverture_debut <= angle_ouverture_fin:
+                return angle_ouverture_debut <= angle <= angle_ouverture_fin
+            else:
+                return angle >= angle_ouverture_debut or angle <= angle_ouverture_fin
+
+        # Vérifier si TOUTE la balle est dans l'ouverture
+        if angle_balle_min <= angle_balle_max:
+            return angle_dans_ouverture(angle_balle_min) and angle_dans_ouverture(angle_balle_max)
+        else:
+            # Cas où la balle traverse 0°
+            points_a_verifier = 5
+            for i in range(points_a_verifier + 1):
+                if i == 0:
+                    angle_test = angle_balle_min
+                elif i == points_a_verifier:
+                    angle_test = angle_balle_max
+                else:
+                    angle_test = (angle_balle_min + (
+                                360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
+
+                if not angle_dans_ouverture(angle_test):
+                    return False
+            return True
+
     def _gerer_collision_balle_cercle(self, balle, cercle):
         """Gère la collision entre une balle et un cercle selon les paramètres configurés"""
         import numpy as np
@@ -125,20 +181,9 @@ class Screen:
                     # Cercle complet
                     collision_detectee = True
                 else:
-                    # Arc : vérifier si la balle touche la partie visible de l'arc (PAS l'ouverture)
-                    angle_balle = math.degrees(math.atan2(direction[1], direction[0]))
-                    angle_balle = (angle_balle + 360) % 360
-
-                    # Calculer les angles de l'ouverture (partie invisible)
-                    angle_ouverture_debut = (cercle.angle_rotation - cercle.angle_ouverture / 2) % 360
-                    angle_ouverture_fin = (cercle.angle_rotation + cercle.angle_ouverture / 2) % 360
-
-                    # Vérifier si la balle touche la partie VISIBLE (pas dans l'ouverture)
-                    if angle_ouverture_debut <= angle_ouverture_fin:
-                        collision_detectee = not (angle_ouverture_debut <= angle_balle <= angle_ouverture_fin)
-                    else:  # L'ouverture traverse 0°
-                        collision_detectee = not (
-                                    angle_balle >= angle_ouverture_debut or angle_balle <= angle_ouverture_fin)
+                    # Arc : vérifier si la balle est ENTIÈREMENT dans l'ouverture
+                    # Si elle n'est PAS entièrement dans l'ouverture, alors il y a collision
+                    collision_detectee = not self._est_entierement_dans_ouverture(balle, cercle)
 
                 if collision_detectee:
                     # Rebond traditionnel
@@ -151,7 +196,8 @@ class Screen:
 
             # Cas 2 : Brisure dans l'ouverture (sans rebond)
             elif self.brisure_dans_ouverture and cercle.angle_ouverture > 0:
-                if cercle.est_dans_ouverture(balle.position):
+                # Utiliser la même logique pour vérifier si la balle traverse l'ouverture
+                if self._est_entierement_dans_ouverture(balle, cercle):
                     # La balle traverse l'ouverture : brise le cercle directement
                     cercle.life = 0  # Brise immédiatement
                     point_collision = list(position)  # Point d'impact = position de la balle
@@ -194,7 +240,6 @@ class Screen:
             direction_angle = angle + random.uniform(-0.2, 0.2)
 
             # Vitesse des particules selon la distance au point d'impact
-            # Correction : vérifier si collision_point est None ou non-vide
             if collision_point is not None and len(collision_point) >= 2:
                 dx = pos_x - collision_point[0]
                 dy = pos_y - collision_point[1]
