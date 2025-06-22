@@ -121,23 +121,24 @@ class Screen:
 
             # Cas 1 : Collision sur contact avec l'arc visible
             if self.collision_sur_contact:
-                if cercle.angle_ouverture >= 360:
+                if cercle.angle_ouverture == 0:
                     # Cercle complet
                     collision_detectee = True
                 else:
-                    # Arc : vérifier si la balle touche la partie visible de l'arc
+                    # Arc : vérifier si la balle touche la partie visible de l'arc (PAS l'ouverture)
                     angle_balle = math.degrees(math.atan2(direction[1], direction[0]))
                     angle_balle = (angle_balle + 360) % 360
 
-                    # Calculer les angles de l'arc visible
-                    angle_debut = (cercle.angle_rotation - cercle.angle_ouverture / 2) % 360
-                    angle_fin = (cercle.angle_rotation + cercle.angle_ouverture / 2) % 360
+                    # Calculer les angles de l'ouverture (partie invisible)
+                    angle_ouverture_debut = (cercle.angle_rotation - cercle.angle_ouverture / 2) % 360
+                    angle_ouverture_fin = (cercle.angle_rotation + cercle.angle_ouverture / 2) % 360
 
-                    # Vérifier si la balle touche la partie visible
-                    if angle_debut <= angle_fin:
-                        collision_detectee = angle_debut <= angle_balle <= angle_fin
-                    else:  # L'arc traverse 0°
-                        collision_detectee = angle_balle >= angle_debut or angle_balle <= angle_fin
+                    # Vérifier si la balle touche la partie VISIBLE (pas dans l'ouverture)
+                    if angle_ouverture_debut <= angle_ouverture_fin:
+                        collision_detectee = not (angle_ouverture_debut <= angle_balle <= angle_ouverture_fin)
+                    else:  # L'ouverture traverse 0°
+                        collision_detectee = not (
+                                    angle_balle >= angle_ouverture_debut or angle_balle <= angle_ouverture_fin)
 
                 if collision_detectee:
                     # Rebond traditionnel
@@ -149,12 +150,16 @@ class Screen:
                     balle.position = list(centre_cercle + normal * (rayon_cercle - balle.taille))
 
             # Cas 2 : Brisure dans l'ouverture (sans rebond)
-            elif self.brisure_dans_ouverture and cercle.angle_ouverture < 360:
+            elif self.brisure_dans_ouverture and cercle.angle_ouverture > 0:
                 if cercle.est_dans_ouverture(balle.position):
                     # La balle traverse l'ouverture : brise le cercle directement
                     cercle.life = 0  # Brise immédiatement
                     point_collision = list(position)  # Point d'impact = position de la balle
                     # Pas de rebond, la balle continue sa trajectoire
+
+            # S'assurer que point_collision est toujours une liste ou None
+            if point_collision is not None and hasattr(point_collision, 'tolist'):
+                point_collision = point_collision.tolist()
 
             return point_collision
 
@@ -189,7 +194,8 @@ class Screen:
             direction_angle = angle + random.uniform(-0.2, 0.2)
 
             # Vitesse des particules selon la distance au point d'impact
-            if collision_point:
+            # Correction : vérifier si collision_point est None ou non-vide
+            if collision_point is not None and len(collision_point) >= 2:
                 dx = pos_x - collision_point[0]
                 dy = pos_y - collision_point[1]
                 distance_impact = math.sqrt(dx * dx + dy * dy)
