@@ -8,131 +8,205 @@ import math
 
 
 class Screen:
-    def __init__(self, taille=(800, 600), couleur_fond="black", titre="Jeu"):
+    def __init__(self, taille=(800, 600), couleur_fond="black", titre="Bounce",
+                 collision_sur_contact=True, brisure_dans_ouverture=False):
         pygame.init()
         self.taille = taille
         self.couleur_fond = couleur_fond
         self.titre = titre
         self.ecran = pygame.display.set_mode(taille)
         pygame.display.set_caption(titre)
+        self.horloge = pygame.time.Clock()
         self.objets = []
         self.particules = []
+        self.en_cours = True
 
-    def ajouter_objet(self, obj):
-        self.objets.append(obj)
+        # Paramètres de collision globaux
+        self.collision_sur_contact = collision_sur_contact
+        self.brisure_dans_ouverture = brisure_dans_ouverture
+
+    def ajouter_objet(self, objet):
+        self.objets.append(objet)
+
+    def retirer_objet(self, objet):
+        if objet in self.objets:
+            self.objets.remove(objet)
 
     def boucle(self, fps=60, duree=None):
-        clock = pygame.time.Clock()
-        temps_ecoule = 0
-        continuer = True
+        import time
+        debut = time.time()
 
-        # Optimisation : extraire balles et cercles une seule fois
-        balles = [obj for obj in self.objets if isinstance(obj, Balle)]
-        cercles = [obj for obj in self.objets if isinstance(obj, Cercle)]
+        while self.en_cours:
+            dt = self.horloge.tick(fps) / 1000.0
 
-        try:
-            while continuer:
-                dt = clock.tick(fps) / 1000  # en secondes
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        continuer = False
+            # Gestion des événements
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.en_cours = False
 
-                # Effacement de l'écran
-                self.ecran.fill(self.couleur_fond)
+            # Vérification de la durée
+            if duree and (time.time() - debut) >= duree:
+                self.en_cours = False
 
-                # Mise à jour des balles
-                for balle in balles:
-                    balle.mettre_a_jour(dt)
-                    # Gestion des collisions avec les bords
-                    if balle.position[0] - balle.taille < 0 or balle.position[0] + balle.taille > self.taille[0]:
-                        balle.vitesse[0] *= -0.8  # Ajout d'amortissement
-                        balle.position[0] = max(balle.taille, min(self.taille[0] - balle.taille, balle.position[0]))
+            # Effacer l'écran
+            self.ecran.fill(self.couleur_fond)
 
-                    if balle.position[1] - balle.taille < 0 or balle.position[1] + balle.taille > self.taille[1]:
-                        balle.vitesse[1] *= -0.8  # Ajout d'amortissement
-                        balle.position[1] = max(balle.taille, min(self.taille[1] - balle.taille, balle.position[1]))
+            # Séparer les objets par type
+            balles = [obj for obj in self.objets if isinstance(obj, Balle)]
+            cercles = [obj for obj in self.objets if isinstance(obj, Cercle)]
 
-                # Gestion des collisions balle-balle
-                for i in range(len(balles)):
-                    for j in range(i + 1, len(balles)):
-                        balles[i].collision_avec_balle(balles[j])
+            # Mise à jour des objets
+            for obj in self.objets:
+                if hasattr(obj, 'mettre_a_jour'):
+                    obj.mettre_a_jour(dt)
 
-                # Gestion des collisions balle-cercle et création des particules
-                for balle in balles:
-                    for cercle in cercles[:]:
-                        collision_point = balle.rebondir(cercle)
-                        if cercle.life <= 0:
-                            # Choisir un style d'explosion
-                            style = random.choice([
-                                StyleExplosion.NORMAL,
-                                StyleExplosion.MULTICOLOR,
-                                StyleExplosion.RAINBOW,
-                                StyleExplosion.FIREWORK
-                            ])
+            # Gestion des collisions entre balles
+            for i in range(len(balles)):
+                for j in range(i + 1, len(balles)):
+                    balles[i].collision_avec_balle(balles[j])
 
-                            # Choisir une palette de couleurs
-                            palette = random.choice(list(Particule.PALETTES.keys()))
+            # Gestion des collisions balle-cercle avec nouvelle logique
+            for balle in balles:
+                for cercle in cercles[:]:
+                    collision_point = self._gerer_collision_balle_cercle(balle, cercle)
 
-                            # Création d'un motif d'explosion sur la circonférence
-                            num_particules = 75
-                            for i in range(num_particules):
-                                # Calcul de la position sur la circonférence
-                                angle = (i / num_particules) * 2 * math.pi
-                                pos_x = cercle.position[0] + cercle.rayon * math.cos(angle)
-                                pos_y = cercle.position[1] + cercle.rayon * math.sin(angle)
+                    if cercle.life <= 0:
+                        self._creer_explosion(cercle, collision_point)
+                        # Suppression du cercle
+                        if cercle in self.objets:
+                            self.objets.remove(cercle)
+                        if cercle in cercles:
+                            cercles.remove(cercle)
 
-                                # Ajout d'un léger décalage aléatoire
-                                pos_x += random.uniform(-2, 2)
-                                pos_y += random.uniform(-2, 2)
+            # Affichage des objets
+            for obj in self.objets:
+                obj.afficher(self.ecran)
 
-                                # La direction initiale des particules suit la forme du cercle
-                                direction_angle = angle + random.uniform(-0.2, 0.2)
+            # Mise à jour et affichage des particules
+            for particule in self.particules[:]:
+                particule.mettre_a_jour(dt)
+                particule.afficher(self.ecran)
 
-                                # Vitesse des particules selon la distance au point d'impact
-                                if collision_point:
-                                    dx = pos_x - collision_point[0]
-                                    dy = pos_y - collision_point[1]
-                                    distance_impact = math.sqrt(dx * dx + dy * dy)
-                                    vitesse_base = 400 - min(200, distance_impact)
-                                else:
-                                    vitesse_base = 200
+                # Supprimer les particules expirées
+                if particule.vie <= 0:
+                    self.particules.remove(particule)
 
-                                vitesse_min = vitesse_base
-                                vitesse_max = vitesse_base * 1.5
+            # Mise à jour de l'affichage
+            pygame.display.flip()
 
-                                # Création de la particule avec le nouveau système
-                                particule = Particule(
-                                    position=[pos_x, pos_y],
-                                    style=style,
-                                    palette_name=palette,
-                                    vitesse_min=vitesse_min,
-                                    vitesse_max=vitesse_max,
-                                    direction_angle=direction_angle
-                                )
-                                self.particules.append(particule)
+        pygame.quit()
 
-                            # Suppression du cercle
-                            if cercle in self.objets:
-                                self.objets.remove(cercle)
-                            if cercle in cercles:
-                                cercles.remove(cercle)
+    def _gerer_collision_balle_cercle(self, balle, cercle):
+        """Gère la collision entre une balle et un cercle selon les paramètres configurés"""
+        import numpy as np
 
-                # Affichage des objets
-                for obj in self.objets:
-                    obj.afficher(self.ecran)
+        centre_cercle = np.array(cercle.position)
+        rayon_cercle = cercle.rayon
+        position = np.array(balle.position)
+        direction = position - centre_cercle
+        distance = np.linalg.norm(direction)
 
-                # Mise à jour et affichage des particules
-                for particule in self.particules[:]:
-                    particule.mettre_a_jour(dt)
-                    particule.afficher(self.ecran)
-                    if particule.vie <= 0:
-                        self.particules.remove(particule)
+        if distance == 0:
+            direction = np.array([1.0, 0.0])
+            distance = 1.0
 
-                pygame.display.flip()
-                temps_ecoule += dt
+        normal = direction / distance
 
-                if duree and temps_ecoule >= duree:
-                    continuer = False
+        # Vérifier si la balle est proche du cercle/arc
+        balle_pres_du_cercle = distance + balle.taille >= rayon_cercle
 
-        finally:
-            pygame.quit()
+        if balle_pres_du_cercle:
+            collision_detectee = False
+            point_collision = None
+
+            # Cas 1 : Collision sur contact avec l'arc visible
+            if self.collision_sur_contact:
+                if cercle.angle_ouverture >= 360:
+                    # Cercle complet
+                    collision_detectee = True
+                else:
+                    # Arc : vérifier si la balle touche la partie visible de l'arc
+                    angle_balle = math.degrees(math.atan2(direction[1], direction[0]))
+                    angle_balle = (angle_balle + 360) % 360
+
+                    # Calculer les angles de l'arc visible
+                    angle_debut = (cercle.angle_rotation - cercle.angle_ouverture / 2) % 360
+                    angle_fin = (cercle.angle_rotation + cercle.angle_ouverture / 2) % 360
+
+                    # Vérifier si la balle touche la partie visible
+                    if angle_debut <= angle_fin:
+                        collision_detectee = angle_debut <= angle_balle <= angle_fin
+                    else:  # L'arc traverse 0°
+                        collision_detectee = angle_balle >= angle_debut or angle_balle <= angle_fin
+
+                if collision_detectee:
+                    # Rebond traditionnel
+                    cercle.life -= 1
+                    point_collision = centre_cercle + normal * rayon_cercle
+
+                    vitesse_vec = np.array(balle.vitesse, dtype=float)
+                    balle.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal)
+                    balle.position = list(centre_cercle + normal * (rayon_cercle - balle.taille))
+
+            # Cas 2 : Brisure dans l'ouverture (sans rebond)
+            elif self.brisure_dans_ouverture and cercle.angle_ouverture < 360:
+                if cercle.est_dans_ouverture(balle.position):
+                    # La balle traverse l'ouverture : brise le cercle directement
+                    cercle.life = 0  # Brise immédiatement
+                    point_collision = list(position)  # Point d'impact = position de la balle
+                    # Pas de rebond, la balle continue sa trajectoire
+
+            return point_collision
+
+        return None
+
+    def _creer_explosion(self, cercle, collision_point):
+        """Crée l'animation d'explosion pour un cercle détruit"""
+        # Choisir un style d'explosion
+        style = random.choice([
+            StyleExplosion.NORMAL,
+            StyleExplosion.MULTICOLOR,
+            StyleExplosion.RAINBOW,
+            StyleExplosion.FIREWORK
+        ])
+
+        # Choisir une palette de couleurs
+        palette = random.choice(list(Particule.PALETTES.keys()))
+
+        # Création d'un motif d'explosion sur la circonférence
+        num_particules = 75
+        for i in range(num_particules):
+            # Calcul de la position sur la circonférence
+            angle = (i / num_particules) * 2 * math.pi
+            pos_x = cercle.position[0] + cercle.rayon * math.cos(angle)
+            pos_y = cercle.position[1] + cercle.rayon * math.sin(angle)
+
+            # Ajout d'un léger décalage aléatoire
+            pos_x += random.uniform(-2, 2)
+            pos_y += random.uniform(-2, 2)
+
+            # La direction initiale des particules suit la forme du cercle
+            direction_angle = angle + random.uniform(-0.2, 0.2)
+
+            # Vitesse des particules selon la distance au point d'impact
+            if collision_point:
+                dx = pos_x - collision_point[0]
+                dy = pos_y - collision_point[1]
+                distance_impact = math.sqrt(dx * dx + dy * dy)
+                vitesse_base = 400 - min(200, distance_impact)
+            else:
+                vitesse_base = 200
+
+            vitesse_min = vitesse_base
+            vitesse_max = vitesse_base * 1.5
+
+            # Création de la particule avec le nouveau système
+            particule = Particule(
+                position=[pos_x, pos_y],
+                style=style,
+                palette_name=palette,
+                vitesse_min=vitesse_min,
+                vitesse_max=vitesse_max,
+                direction_angle=direction_angle
+            )
+            self.particules.append(particule)
