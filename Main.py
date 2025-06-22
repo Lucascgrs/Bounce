@@ -49,7 +49,7 @@ class Jeu:
                 break
 
             # Paramètres pour les arcs de cercle
-            angle_ouverture = 30  # 30° d'ouverture (partie invisible) comme demandé
+            angle_ouverture = 90  # 30° d'ouverture (partie invisible) comme demandé
             angle_rotation_initial = k * 60  # Décaler la position initiale de chaque arc
             vitesse_rotation = 90 + k * 30  # Vitesse de rotation différente pour chaque arc
 
@@ -106,11 +106,6 @@ class Jeu:
 
 
 if __name__ == "__main__":
-    # Test 1 : Collision traditionnelle (rebond sur l'arc visible, pas dans l'ouverture)
-    jeu = Jeu(nb_balles=2, nb_cercles=1, duree=61, collision_sur_contact=True, brisure_dans_ouverture=False)
-
-    # Test 2 : Brisure dans l'ouverture (pas de rebond, brise quand traverse l'ouverture)
-    # jeu = Jeu(nb_balles=2, nb_cercles=2, duree=61, collision_sur_contact=False, brisure_dans_ouverture=True)
-
+    jeu = Jeu(nb_balles=1, nb_cercles=1, duree=61, collision_sur_contact=True, brisure_dans_ouverture=True)
     time.sleep(0.5)
     jeu.demarrer()

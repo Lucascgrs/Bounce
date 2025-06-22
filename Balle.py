@@ -16,6 +16,9 @@ class Balle:
         self.direction = [1, 1]
         self.coef_collision = coef_collision
 
+        # Compteur pour les logs
+        self.log_counter = 0
+
         if self.image_path:
             try:
                 # Charger l'image originale
@@ -57,13 +60,30 @@ class Balle:
             self.image = None
 
     def mettre_a_jour(self, dt):
+        # LOG: Position avant mise à jour
+        old_position = self.position.copy()
+
         # Ajoute la gravité à la vitesse verticale
         self.vitesse[1] += self.gravite * dt
         # Met à jour la position en fonction de la vitesse
         self.position[0] += self.vitesse[0] * dt
         self.position[1] += self.vitesse[1] * dt
 
+        # LOG: Détecter les changements brusques de position
+        self.log_counter += 1
+        if self.log_counter % 120 == 0:  # Toutes les 2 secondes à 60 FPS
+            distance_mouvement = ((self.position[0] - old_position[0]) ** 2 + (
+                        self.position[1] - old_position[1]) ** 2) ** 0.5
+            if distance_mouvement > 50:  # Mouvement suspect
+                print(f"🚨 MOUVEMENT SUSPECT dans mettre_a_jour!")
+                print(f"   Avant: ({old_position[0]:.1f}, {old_position[1]:.1f})")
+                print(f"   Après: ({self.position[0]:.1f}, {self.position[1]:.1f})")
+                print(f"   Distance: {distance_mouvement:.1f}")
+
     def collision_avec_balle(self, autre_balle):
+        # LOG: Position avant collision
+        old_position = self.position.copy()
+
         # Calcul de la distance entre les centres des balles
         dx = autre_balle.position[0] - self.position[0]
         dy = autre_balle.position[1] - self.position[1]
@@ -108,6 +128,12 @@ class Balle:
             autre_balle.position[0] += recouvrement * nx
             autre_balle.position[1] += recouvrement * ny
 
+            # LOG: Position après collision balle-balle
+            if self.log_counter % 60 == 0:
+                print(f"⚡ COLLISION BALLE-BALLE!")
+                print(f"   Position avant: ({old_position[0]:.1f}, {old_position[1]:.1f})")
+                print(f"   Position après: ({self.position[0]:.1f}, {self.position[1]:.1f})")
+
     def afficher(self, surface):
         # Position pour le blit (coin supérieur gauche)
         pos_x = int(self.position[0] - self.taille)
@@ -128,4 +154,5 @@ class Balle:
                                (int(self.position[0]), int(self.position[1])),
                                self.taille)
             if self.contour:
-                pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])), self.taille, self.contour[1])
+                pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])),
+                                   self.taille, self.contour[1])
