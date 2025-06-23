@@ -49,7 +49,7 @@ class Jeu:
                 break
 
             # Paramètres pour les arcs de cercle
-            angle_ouverture = 90  # 30° d'ouverture (partie invisible) comme demandé
+            angle_ouverture = 180  # 30° d'ouverture (partie invisible) comme demandé
             angle_rotation_initial = k * 60  # Décaler la position initiale de chaque arc
             vitesse_rotation = 90 + k * 30  # Vitesse de rotation différente pour chaque arc
 
@@ -95,9 +95,7 @@ class Jeu:
                 position=(x, y),
                 vitesse=vitesse,
                 coef_collision=1.1,  # Augmenté pour des rebonds plus dynamiques
-                coef_gravite=0.6,  # Nouveau paramètre pour ajuster la gravité
-                # contour=("white", 2)  # Ajout d'une bordure blanche
-            )
+                coef_gravite=0.6)
             self.balles.append(balle)
             self.screen.ajouter_objet(balle)
 
