@@ -36,7 +36,8 @@ class Jeu:
             couleur_fond=couleur_fond,
             titre=titre,
             collision_sur_contact=collision_sur_contact,
-            brisure_dans_ouverture=brisure_dans_ouverture
+            brisure_dans_ouverture=brisure_dans_ouverture,
+            debug=True
         )
 
         epaisseur = 5

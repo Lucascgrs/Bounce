@@ -9,7 +9,7 @@ import math
 
 class Screen:
     def __init__(self, taille=(800, 600), couleur_fond="black", titre="Bounce",
-                 collision_sur_contact=True, brisure_dans_ouverture=False, marge_suppression=100):
+                 collision_sur_contact=True, brisure_dans_ouverture=False, marge_suppression=100, debug=False):
         pygame.init()
         self.taille = taille
         self.couleur_fond = couleur_fond
@@ -21,10 +21,16 @@ class Screen:
         self.particules = []
         self.en_cours = True
         self.marge_suppression = marge_suppression
+        self.debug = debug
 
         # Paramètres de collision globaux
         self.collision_sur_contact = collision_sur_contact
         self.brisure_dans_ouverture = brisure_dans_ouverture
+
+    def log_debug(self, message):
+        """Affiche les messages de debug si activé"""
+        if self.debug:
+            print(f"[DEBUG] {message}")
 
     def ajouter_objet(self, objet):
         self.objets.append(objet)
@@ -58,6 +64,8 @@ class Screen:
         # Retirer les objets identifiés
         for obj in objets_a_retirer:
             self.retirer_objet(obj)
+            self.log_debug(
+                f"Objet retiré hors écran: {type(obj).__name__} à {getattr(obj, 'position', 'position inconnue')}")
 
         return len(objets_a_retirer)
 
@@ -91,6 +99,8 @@ class Screen:
 
             # Retirer les objets hors écran
             objets_retires = self.retirer_objets_hors_ecran()
+            if objets_retires > 0:
+                self.log_debug(f"{objets_retires} objets retirés de l'écran")
 
             # Gestion des collisions entre balles
             for i in range(len(balles)):
@@ -103,6 +113,7 @@ class Screen:
                     collision_point = self._gerer_collision_balle_cercle(balle, cercle)
 
                     if cercle.life <= 0:
+                        self.log_debug(f"Cercle détruit! Création d'explosion à {collision_point}")
                         self._creer_explosion(cercle, collision_point)
                         # Suppression du cercle
                         if cercle in self.objets:
@@ -122,6 +133,8 @@ class Screen:
                 # Supprimer les particules expirées
                 if particule.vie <= 0:
                     self.particules.remove(particule)
+
+            self.log_debug("\n")
 
             # Mise à jour de l'affichage
             pygame.display.flip()
@@ -212,59 +225,93 @@ class Screen:
         s_approche = np.dot(vitesse_vec, normal) < 0  # True si la balle s'approche du centre
         s_eloigne = np.dot(vitesse_vec, normal) > 0  # True si la balle s'éloigne du centre
 
+        # Logs détaillés
+        self.log_debug(f"Balle pos: {[round(x, 2) for x in balle.position]}, Cercle pos: {cercle.position}")
+        self.log_debug(f"Distance: {distance:.2f}, Rayon: {rayon_cercle}, Taille balle: {balle.taille}")
+        self.log_debug(
+            f"Proche du cercle: {balle_pres_du_cercle}, À l'intérieur: {balle_a_l_interieur}, À l'extérieur: {balle_a_l_exterieur}")
+        self.log_debug(f"S'approche: {s_approche}, S'éloigne: {s_eloigne}")
+        self.log_debug(
+            f"Mode collision_sur_contact: {self.collision_sur_contact}, Mode brisure: {self.brisure_dans_ouverture}")
+
         if balle_pres_du_cercle:
             collision_detectee = False
             point_collision = None
+            brisure_detectee = False
 
-            # Cas 1 : Collision sur contact avec l'arc visible
-            if self.collision_sur_contact:
+            # Vérifier d'abord la brisure dans l'ouverture (priorité plus haute)
+            if self.brisure_dans_ouverture and cercle.angle_ouverture > 0:
+                self.log_debug("Vérification: BRISURE DANS OUVERTURE")
+                balle_entierement_dans_ouverture = self._est_entierement_dans_ouverture(balle, cercle)
+                self.log_debug(f"Balle entièrement dans ouverture: {balle_entierement_dans_ouverture}")
+
+                # Conditions pour la brisure : balle dans l'ouverture ET proche du cercle
+                if balle_entierement_dans_ouverture and balle_pres_du_cercle:
+                    # La balle traverse l'ouverture : brise le cercle directement
+                    cercle.life = 0  # Brise immédiatement
+                    point_collision = list(position)  # Point d'impact = position de la balle
+                    brisure_detectee = True
+                    self.log_debug(f"BRISURE! Cercle brisé à la position: {[round(x, 2) for x in point_collision]}")
+                    # Pas de rebond, la balle continue sa trajectoire
+                else:
+                    self.log_debug("Conditions de brisure non remplies")
+
+            # Si pas de brisure, vérifier les collisions normales
+            if not brisure_detectee and self.collision_sur_contact:
+                self.log_debug("Vérification: COLLISION SUR CONTACT")
                 if cercle.angle_ouverture == 0:
                     # Cercle complet - collision normale
                     collision_detectee = True
+                    self.log_debug("Cercle complet - collision détectée")
                 else:
                     # Arc : logique d'ouverture avec vérification de direction
                     balle_entierement_dans_ouverture = self._est_entierement_dans_ouverture(balle, cercle)
+                    self.log_debug(
+                        f"Angle ouverture: {cercle.angle_ouverture}°, Rotation: {cercle.angle_rotation:.1f}°")
+                    self.log_debug(f"Balle entièrement dans ouverture: {balle_entierement_dans_ouverture}")
 
                     if balle_entierement_dans_ouverture:
                         # Balle dans l'ouverture - pas de collision
                         collision_detectee = False
+                        self.log_debug("Balle dans l'ouverture - PAS DE COLLISION")
                     elif balle_a_l_exterieur and s_eloigne:
                         # Balle à l'extérieur qui s'éloigne - pas de collision (évite la re-téléportation)
                         collision_detectee = False
+                        self.log_debug("Balle à l'extérieur qui s'éloigne - PAS DE COLLISION (anti re-téléportation)")
                     elif balle_a_l_interieur and s_approche:
                         # Balle à l'intérieur qui s'approche du bord - collision normale
                         collision_detectee = True
+                        self.log_debug("Balle à l'intérieur qui s'approche - COLLISION")
                     elif not balle_a_l_interieur and not balle_a_l_exterieur:
                         # Balle en intersection avec le cercle - collision normale
                         collision_detectee = True
+                        self.log_debug("Balle en intersection avec le cercle - COLLISION")
                     elif balle_a_l_exterieur and s_approche:
                         # Balle à l'extérieur qui s'approche - collision normale
                         collision_detectee = True
+                        self.log_debug("Balle à l'extérieur qui s'approche - COLLISION")
                     else:
                         # Autres cas - pas de collision
                         collision_detectee = False
+                        self.log_debug("Autres cas - PAS DE COLLISION")
 
                 if collision_detectee:
                     # Rebond traditionnel
                     cercle.life -= 1
                     point_collision = centre_cercle + normal * rayon_cercle
+                    self.log_debug(f"REBOND! Vie du cercle: {cercle.life}")
 
                     vitesse_vec = np.array(balle.vitesse, dtype=float)
-                    balle.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal)
+                    nouvelle_vitesse = vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal
+                    balle.vitesse = list(nouvelle_vitesse)
 
                     # Repositionner selon la position d'origine
                     if balle_a_l_interieur:
                         # Balle vient de l'intérieur - la placer à l'intérieur
-                        balle.position = list(centre_cercle + normal * (rayon_cercle - balle.taille))
-
-            # Cas 2 : Brisure dans l'ouverture (sans rebond)
-            elif self.brisure_dans_ouverture and cercle.angle_ouverture > 0:
-                # Utiliser la même logique pour vérifier si la balle traverse l'ouverture
-                if self._est_entierement_dans_ouverture(balle, cercle):
-                    # La balle traverse l'ouverture : brise le cercle directement
-                    cercle.life = 0  # Brise immédiatement
-                    point_collision = list(position)  # Point d'impact = position de la balle
-                    # Pas de rebond, la balle continue sa trajectoire
+                        nouvelle_position = centre_cercle + normal * (rayon_cercle - balle.taille)
+                        balle.position = list(nouvelle_position)
+                        self.log_debug(f"Repositionnement INTÉRIEUR: {[round(x, 2) for x in balle.position]}")
+                    self.log_debug(f"Nouvelle vitesse: {[round(x, 2) for x in balle.vitesse]}")
 
             # S'assurer que point_collision est toujours une liste ou None
             if point_collision is not None and hasattr(point_collision, 'tolist'):
@@ -276,6 +323,8 @@ class Screen:
 
     def _creer_explosion(self, cercle, collision_point):
         """Crée l'animation d'explosion pour un cercle détruit"""
+        self.log_debug(f"Création explosion avec {75} particules")
+
         # Choisir un style d'explosion
         style = random.choice([
             StyleExplosion.NORMAL,
@@ -286,6 +335,8 @@ class Screen:
 
         # Choisir une palette de couleurs
         palette = random.choice(list(Particule.PALETTES.keys()))
+
+        self.log_debug(f"Style explosion: {style}, Palette: {palette}")
 
         # Création d'un motif d'explosion sur la circonférence
         num_particules = 75
