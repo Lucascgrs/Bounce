@@ -203,6 +203,15 @@ class Screen:
         # Vérifier si la balle est proche du cercle/arc
         balle_pres_du_cercle = distance + balle.taille >= rayon_cercle
 
+        # Vérifier si la balle est à l'intérieur ou à l'extérieur du cercle
+        balle_a_l_interieur = distance <= rayon_cercle - balle.taille
+        balle_a_l_exterieur = distance >= rayon_cercle + balle.taille
+
+        # Calculer la direction du mouvement de la balle par rapport au cercle
+        vitesse_vec = np.array(balle.vitesse)
+        s_approche = np.dot(vitesse_vec, normal) < 0  # True si la balle s'approche du centre
+        s_eloigne = np.dot(vitesse_vec, normal) > 0  # True si la balle s'éloigne du centre
+
         if balle_pres_du_cercle:
             collision_detectee = False
             point_collision = None
@@ -210,12 +219,30 @@ class Screen:
             # Cas 1 : Collision sur contact avec l'arc visible
             if self.collision_sur_contact:
                 if cercle.angle_ouverture == 0:
-                    # Cercle complet
+                    # Cercle complet - collision normale
                     collision_detectee = True
                 else:
-                    # Arc : vérifier si la balle est ENTIÈREMENT dans l'ouverture
-                    # Si elle n'est PAS entièrement dans l'ouverture, alors il y a collision
-                    collision_detectee = not self._est_entierement_dans_ouverture(balle, cercle)
+                    # Arc : logique d'ouverture avec vérification de direction
+                    balle_entierement_dans_ouverture = self._est_entierement_dans_ouverture(balle, cercle)
+
+                    if balle_entierement_dans_ouverture:
+                        # Balle dans l'ouverture - pas de collision
+                        collision_detectee = False
+                    elif balle_a_l_exterieur and s_eloigne:
+                        # Balle à l'extérieur qui s'éloigne - pas de collision (évite la re-téléportation)
+                        collision_detectee = False
+                    elif balle_a_l_interieur and s_approche:
+                        # Balle à l'intérieur qui s'approche du bord - collision normale
+                        collision_detectee = True
+                    elif not balle_a_l_interieur and not balle_a_l_exterieur:
+                        # Balle en intersection avec le cercle - collision normale
+                        collision_detectee = True
+                    elif balle_a_l_exterieur and s_approche:
+                        # Balle à l'extérieur qui s'approche - collision normale
+                        collision_detectee = True
+                    else:
+                        # Autres cas - pas de collision
+                        collision_detectee = False
 
                 if collision_detectee:
                     # Rebond traditionnel
@@ -224,7 +251,11 @@ class Screen:
 
                     vitesse_vec = np.array(balle.vitesse, dtype=float)
                     balle.vitesse = list(vitesse_vec - 2 * np.dot(vitesse_vec, normal) * normal)
-                    balle.position = list(centre_cercle + normal * (rayon_cercle - balle.taille))
+
+                    # Repositionner selon la position d'origine
+                    if balle_a_l_interieur:
+                        # Balle vient de l'intérieur - la placer à l'intérieur
+                        balle.position = list(centre_cercle + normal * (rayon_cercle - balle.taille))
 
             # Cas 2 : Brisure dans l'ouverture (sans rebond)
             elif self.brisure_dans_ouverture and cercle.angle_ouverture > 0:
