@@ -4,8 +4,7 @@ import math
 
 
 class Cercle:
-    def __init__(self, position, rayon, couleur="black", epaisseur=2, life=20,
-                 angle_ouverture=0, angle_rotation=0, vitesse_rotation=0):
+    def __init__(self, position, rayon, couleur="black", epaisseur=2, life=20, angle_ouverture=0, angle_rotation=0, vitesse_rotation=0):
         self.position = position
         self.rayon = rayon
         self.couleur = couleur

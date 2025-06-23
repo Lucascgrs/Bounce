@@ -10,8 +10,7 @@ import math
 
 
 class Jeu:
-    def __init__(self, nb_balles=1, nb_cercles=1, taille_ecran=(800, 600), couleur_fond="black", titre="Balles",
-                 duree=30, fps=120, marge=10, collision_sur_contact=True, brisure_dans_ouverture=False):
+    def __init__(self, nb_balles=1, nb_cercles=1, taille_ecran=(800, 600), couleur_fond="black", titre="Balles", duree=30, fps=120, marge=10, collision_sur_contact=True, brisure_dans_ouverture=False):
         self.taille_ecran = taille_ecran
         self.couleur_fond = couleur_fond
         self.titre = titre
@@ -37,7 +36,7 @@ class Jeu:
             titre=titre,
             collision_sur_contact=collision_sur_contact,
             brisure_dans_ouverture=brisure_dans_ouverture,
-            debug=True
+            debug=False
         )
 
         epaisseur = 5
