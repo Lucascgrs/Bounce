@@ -49,7 +49,7 @@ class Jeu:
                 break
 
             # Paramètres pour les arcs de cercle
-            angle_ouverture = 180  # 30° d'ouverture (partie invisible) comme demandé
+            angle_ouverture = 50  # 30° d'ouverture (partie invisible) comme demandé
             angle_rotation_initial = k * 60  # Décaler la position initiale de chaque arc
             vitesse_rotation = 90 + k * 30  # Vitesse de rotation différente pour chaque arc
 

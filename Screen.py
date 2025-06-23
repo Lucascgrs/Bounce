@@ -9,7 +9,7 @@ import math
 
 class Screen:
     def __init__(self, taille=(800, 600), couleur_fond="black", titre="Bounce",
-                 collision_sur_contact=True, brisure_dans_ouverture=False):
+                 collision_sur_contact=True, brisure_dans_ouverture=False, marge_suppression=100):
         pygame.init()
         self.taille = taille
         self.couleur_fond = couleur_fond
@@ -20,6 +20,7 @@ class Screen:
         self.objets = []
         self.particules = []
         self.en_cours = True
+        self.marge_suppression = marge_suppression
 
         # Paramètres de collision globaux
         self.collision_sur_contact = collision_sur_contact
@@ -31,6 +32,34 @@ class Screen:
     def retirer_objet(self, objet):
         if objet in self.objets:
             self.objets.remove(objet)
+
+    def retirer_objets_hors_ecran(self):
+        """Retire les objets qui sont sortis de l'écran avec une marge"""
+        objets_a_retirer = []
+
+        for obj in self.objets:
+            if hasattr(obj, 'position'):
+                x, y = obj.position
+
+                # Obtenir la taille de l'objet (différents attributs selon le type)
+                taille = 0
+                if hasattr(obj, 'taille'):
+                    taille = obj.taille
+                elif hasattr(obj, 'rayon'):
+                    taille = obj.rayon
+
+                # Vérifier si l'objet est complètement hors de l'écran avec marge
+                if (x + taille < -self.marge_suppression or
+                        x - taille > self.taille[0] + self.marge_suppression or
+                        y + taille < -self.marge_suppression or
+                        y - taille > self.taille[1] + self.marge_suppression):
+                    objets_a_retirer.append(obj)
+
+        # Retirer les objets identifiés
+        for obj in objets_a_retirer:
+            self.retirer_objet(obj)
+
+        return len(objets_a_retirer)
 
     def boucle(self, fps=60, duree=None):
         import time
@@ -59,6 +88,9 @@ class Screen:
             for obj in self.objets:
                 if hasattr(obj, 'mettre_a_jour'):
                     obj.mettre_a_jour(dt)
+
+            # Retirer les objets hors écran
+            objets_retires = self.retirer_objets_hors_ecran()
 
             # Gestion des collisions entre balles
             for i in range(len(balles)):
@@ -146,7 +178,7 @@ class Screen:
                     angle_test = angle_balle_max
                 else:
                     angle_test = (angle_balle_min + (
-                                360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
+                            360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
 
                 if not angle_dans_ouverture(angle_test):
                     return False
