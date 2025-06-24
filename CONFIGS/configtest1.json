@@ -1,0 +1,67 @@
+{
+    "ecran": {
+        "taille": [
+            600,
+            600
+        ],
+        "couleur_fond": "black",
+        "titre": "Bounce Game",
+        "fps": 200,
+        "collision_sur_contact": true,
+        "brisure_dans_ouverture": false,
+        "marge_suppression": 300,
+        "debug": false
+    },
+    "balles": [
+        {
+            "position": [
+                100.0,
+                100.0
+            ],
+            "vitesse": [
+                150.0,
+                100.0
+            ],
+            "taille": 15.0,
+            "couleur": "white"
+        },
+        {
+            "position": [
+                120.0,
+                120.0
+            ],
+            "vitesse": [
+                150.0,
+                100.0
+            ],
+            "taille": 15.0,
+            "couleur": "white"
+        }
+    ],
+    "cercles": [
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 80.0,
+            "couleur": "blue",
+            "life": 20,
+            "angle_ouverture": 40.0,
+            "angle_rotation_initial": 0.0,
+            "vitesse_rotation": 10.0
+        },
+        {
+            "position": [
+                350.0,
+                350.0
+            ],
+            "rayon": 100.0,
+            "couleur": "blue",
+            "life": 20,
+            "angle_ouverture": 40.0,
+            "angle_rotation_initial": 0.0,
+            "vitesse_rotation": 10.0
+        }
+    ]
+}
