@@ -1089,3 +1089,70 @@ class ConfigEditor:
         self.refresh_images_list()
 
     def launch_game(self):
+        """Lance le jeu avec la configuration actuelle"""
+        try:
+            # Sauvegarder temporairement la config actuelle
+            temp_config_path = os.path.join(self.config_dir, "_temp_config.json")
+
+            # Appliquer d'abord la config de l'écran si elle n'a pas été appliquée
+            self.apply_screen_config()
+
+            # Sauvegarder la configuration temporaire
+            with open(temp_config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+
+            # Importer et lancer le jeu
+            try:
+                from Launcher import lancer_jeu_depuis_fichier
+
+                # Minimiser l'éditeur pendant le jeu
+                self.root.iconify()
+
+                # Lancer le jeu
+                lancer_jeu_depuis_fichier(temp_config_path)
+
+                # Restaurer l'éditeur après le jeu
+                self.root.deiconify()
+
+            except ImportError:
+                messagebox.showerror("Erreur",
+                                     "Impossible d'importer le module Launcher.\n"
+                                     "Assurez-vous que Launcher.py est présent dans le même dossier.")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur lors du lancement du jeu: {e}")
+                self.root.deiconify()  # Restaurer en cas d'erreur
+
+            # Nettoyer le fichier temporaire
+            try:
+                if os.path.exists(temp_config_path):
+                    os.remove(temp_config_path)
+            except:
+                pass  # Ignore les erreurs de suppression
+
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la préparation du jeu: {e}")
+
+    def run(self):
+        """Lance l'éditeur de configuration"""
+        try:
+            self.root.mainloop()
+        except KeyboardInterrupt:
+            print("\n👋 Éditeur fermé par l'utilisateur")
+        except Exception as e:
+            print(f"❌ Erreur dans l'éditeur: {e}")
+
+
+def main():
+    """Point d'entrée principal pour l'éditeur"""
+    print("🎨 Lancement de l'éditeur de configuration Bounce")
+
+    try:
+        editor = ConfigEditor()
+        editor.run()
+    except Exception as e:
+        print(f"❌ Erreur fatale: {e}")
+        input("Appuyez sur Entrée pour quitter...")
+
+
+if __name__ == "__main__":
+    main()
