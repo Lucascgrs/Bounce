@@ -27,31 +27,26 @@ def main():
             from Launcher import main as launcher_main
             launcher_main()
     else:
-        # Mode interactif
+        # Mode interactif simplifié
         print("Que voulez-vous faire ?")
-        print("1. 🎮 Jouer (configurations rapides)")
-        print("2. 🎯 Jouer (configurations personnalisées)")
-        print("3. 🎨 Éditeur de configuration")
-        print("4. ❌ Quitter")
+        print("1. 🎯 Jouer (configurations JSON)")
+        print("2. 🎨 Éditeur de configuration")
+        print("3. ❌ Quitter")
 
-        choix = input("\nVotre choix [1-4]: ").strip()
+        choix = input("\nVotre choix [1-3]: ").strip()
 
         if choix == "1":
-            from Launcher import lancer_jeu_depuis_config_rapide
-            lancer_jeu_depuis_config_rapide()
-
-        elif choix == "2":
             from Launcher import main as launcher_main
             launcher_main()
 
-        elif choix == "3":
+        elif choix == "2":
             try:
                 from ConfigEditor import main as editor_main
                 editor_main()
             except ImportError:
                 print("❌ Éditeur non disponible (ConfigEditor.py manquant)")
 
-        elif choix == "4":
+        elif choix == "3":
             print("👋 Au revoir !")
 
         else:

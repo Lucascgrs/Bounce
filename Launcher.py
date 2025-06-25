@@ -27,7 +27,10 @@ def creer_objets_depuis_config_json(screen, config):
 
         # Gestion de l'apparence
         type_apparence = balle_config.get("type_apparence", "couleur")
-        image = balle_config.get("image", "") if type_apparence == "image" else None
+        if type_apparence == "image" and balle_config.get("image"):
+            image = os.path.join("Images", balle_config.get("image"))
+        else:
+            image = None
 
         balle = Balle(
             position=balle_config["position"],
@@ -52,39 +55,17 @@ def creer_objets_depuis_config_json(screen, config):
             }
             couleur = couleur_map.get(couleur, [255, 0, 0])
 
+        # CORRECTION : Mapper angle_rotation_initial du JSON vers angle_rotation de la classe
         cercle = Cercle(
             position=cercle_config["position"],
             rayon=cercle_config["rayon"],
             angle_ouverture=cercle_config.get("angle_ouverture", 0),
             couleur=couleur,
             life=cercle_config.get("life", 1),
-            angle_rotation_initial=cercle_config.get("angle_rotation_initial", 0),
+            angle_rotation=cercle_config.get("angle_rotation_initial", 0),  # Mapping JSON → classe
             vitesse_rotation=cercle_config.get("vitesse_rotation", 0)
         )
         screen.ajouter_objet(cercle)
-
-
-def creer_objets_depuis_config_simple(screen, objets_config):
-    """Crée les objets du jeu à partir de l'ancienne configuration simple"""
-    for obj_config in objets_config:
-        if obj_config["type"] == "balle":
-            balle = Balle(
-                position=obj_config["position"],
-                vitesse=obj_config["vitesse"],
-                taille=obj_config["taille"],
-                couleur=obj_config["couleur"]
-            )
-            screen.ajouter_objet(balle)
-
-        elif obj_config["type"] == "cercle":
-            cercle = Cercle(
-                position=obj_config["position"],
-                rayon=obj_config["rayon"],
-                angle_ouverture=obj_config.get("angle_ouverture", 0),
-                couleur=obj_config["couleur"],
-                life=obj_config.get("life", 1)
-            )
-            screen.ajouter_objet(cercle)
 
 
 def lancer_jeu_depuis_fichier(fichier_config):
@@ -132,107 +113,6 @@ def lancer_jeu_depuis_fichier(fichier_config):
         print(f"❌ Erreur lors du lancement: {e}")
 
 
-def lancer_jeu_depuis_config_rapide(nom_config=None):
-    """Lance le jeu avec les configurations rapides (anciennes)"""
-    # Configurations rapides intégrées
-    CONFIGS = {
-        "classique": {
-            "titre": "Bounce - Classique",
-            "taille_ecran": (800, 600),
-            "couleur_fond": "black",
-            "collision_sur_contact": True,
-            "brisure_dans_ouverture": False,
-            "fps": 60,
-            "objets": [
-                {"type": "balle", "position": [100, 100], "vitesse": [200, 150], "taille": 10, "couleur": "white"},
-                {"type": "balle", "position": [200, 200], "vitesse": [-150, 200], "taille": 8, "couleur": "yellow"},
-                {"type": "cercle", "position": [400, 300], "rayon": 80, "angle_ouverture": 0, "couleur": "red",
-                 "life": 3},
-                {"type": "cercle", "position": [600, 200], "rayon": 60, "angle_ouverture": 90, "couleur": "blue",
-                 "life": 2},
-            ]
-        },
-
-        "arcade": {
-            "titre": "Bounce - Arcade",
-            "taille_ecran": (1000, 700),
-            "couleur_fond": "navy",
-            "collision_sur_contact": True,
-            "brisure_dans_ouverture": False,
-            "fps": 60,
-            "objets": [
-                {"type": "balle", "position": [50, 50], "vitesse": [300, 200], "taille": 12, "couleur": "lime"},
-                {"type": "balle", "position": [100, 150], "vitesse": [250, -180], "taille": 10, "couleur": "cyan"},
-                {"type": "balle", "position": [150, 250], "vitesse": [-200, 250], "taille": 8, "couleur": "magenta"},
-                {"type": "cercle", "position": [500, 200], "rayon": 100, "angle_ouverture": 60, "couleur": "red",
-                 "life": 5},
-                {"type": "cercle", "position": [300, 400], "rayon": 70, "angle_ouverture": 120, "couleur": "green",
-                 "life": 3},
-            ]
-        }
-    }
-
-    def afficher_configs():
-        print("\n🎮 Configurations rapides disponibles:")
-        print("=" * 40)
-        for nom, config in CONFIGS.items():
-            nb_balles = len([obj for obj in config["objets"] if obj["type"] == "balle"])
-            nb_cercles = len([obj for obj in config["objets"] if obj["type"] == "cercle"])
-            print(f"• {nom.upper():<12} - {nb_balles} balle(s), {nb_cercles} cercle(s)")
-        print("=" * 40)
-
-    def choisir_config():
-        afficher_configs()
-        while True:
-            choix = input("\nQuelle configuration voulez-vous ? ").strip().lower()
-            if choix in CONFIGS:
-                return choix
-            elif choix in ['quit', 'q', 'exit']:
-                return None
-            else:
-                configs_dispo = ", ".join(CONFIGS.keys())
-                print(f"❌ Configuration inconnue. Choisissez parmi: {configs_dispo}")
-
-    # Si aucune config spécifiée, demander à l'utilisateur
-    if nom_config is None:
-        nom_config = choisir_config()
-        if nom_config is None:
-            print("👋 Au revoir !")
-            return
-
-    # Vérifier que la config existe
-    if nom_config not in CONFIGS:
-        print(f"❌ Configuration '{nom_config}' introuvable. Utilisation de 'classique'.")
-        nom_config = "classique"
-
-    # Récupérer la configuration
-    config = CONFIGS[nom_config]
-
-    print(f"\n🚀 Lancement de: {config['titre']}")
-    print(f"   Taille: {config['taille_ecran']}")
-    print(f"   Mode collision: {'Contact' if config['collision_sur_contact'] else 'Perçage'}")
-    print("   Appuyez sur la croix pour quitter")
-    print("   Bon jeu ! 🎯\n")
-
-    # Créer l'écran de jeu
-    screen = Screen(
-        taille=config["taille_ecran"],
-        couleur_fond=config["couleur_fond"],
-        titre=config["titre"],
-        collision_sur_contact=config["collision_sur_contact"],
-        brisure_dans_ouverture=config["brisure_dans_ouverture"]
-    )
-
-    # Ajouter les objets
-    creer_objets_depuis_config_simple(screen, config["objets"])
-
-    # Lancer la boucle de jeu
-    try:
-        screen.boucle(fps=config["fps"])
-    except KeyboardInterrupt:
-        print("\n👋 Jeu interrompu par l'utilisateur")
-
-
 def lister_configs_disponibles():
     """Liste les configurations JSON disponibles"""
     config_dir = "CONFIGS"
@@ -268,38 +148,30 @@ def main():
                 else:
                     print(f"❌ Fichier '{arg}' introuvable")
         else:
-            # Configuration rapide
-            lancer_jeu_depuis_config_rapide(arg.lower())
+            print(f"❌ Format de fichier non supporté. Utilisez un fichier .json")
     else:
-        # Mode interactif
-        print("\nOptions disponibles:")
-        print("1. Configurations rapides (classique, arcade)")
-        print("2. Configurations JSON personnalisées")
-
+        # Mode interactif - seulement les configs JSON
         configs_json = lister_configs_disponibles()
-        if configs_json:
-            print("\nConfigurations JSON disponibles:")
-            for i, config in enumerate(configs_json, 1):
-                print(f"   {i}. {config}")
 
-        choix = input("\nVoulez-vous utiliser une config rapide (r) ou JSON (j) ? [r/j]: ").strip().lower()
+        if not configs_json:
+            print("❌ Aucune configuration JSON trouvée dans le dossier CONFIGS/")
+            return
 
-        if choix == 'j' and configs_json:
-            print("\nConfigurations JSON:")
-            for i, config in enumerate(configs_json, 1):
-                print(f"{i}. {config}")
+        print("\n📁 Configurations JSON disponibles:")
+        for i, config in enumerate(configs_json, 1):
+            print(f"   {i}. {config}")
 
-            try:
-                num = int(input("Numéro de la configuration: ")) - 1
-                if 0 <= num < len(configs_json):
-                    fichier = os.path.join("CONFIGS", configs_json[num])
-                    lancer_jeu_depuis_fichier(fichier)
-                else:
-                    print("❌ Numéro invalide")
-            except ValueError:
-                print("❌ Veuillez entrer un numéro valide")
-        else:
-            lancer_jeu_depuis_config_rapide()
+        try:
+            num = int(input("\nNuméro de la configuration à lancer: ")) - 1
+            if 0 <= num < len(configs_json):
+                fichier = os.path.join("CONFIGS", configs_json[num])
+                lancer_jeu_depuis_fichier(fichier)
+            else:
+                print("❌ Numéro invalide")
+        except ValueError:
+            print("❌ Veuillez entrer un numéro valide")
+        except KeyboardInterrupt:
+            print("\n👋 Au revoir !")
 
 
 if __name__ == "__main__":

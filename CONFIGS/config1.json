@@ -4,7 +4,11 @@
             600,
             600
         ],
-        "couleur_fond": "black",
+        "couleur_fond": [
+            0,
+            0,
+            0
+        ],
         "titre": "Bounce Game",
         "fps": 200,
         "collision_sur_contact": true,
@@ -15,27 +19,39 @@
     "balles": [
         {
             "position": [
-                100.0,
-                100.0
+                250.0,
+                300.0
             ],
             "vitesse": [
-                150.0,
-                100.0
+                15.0,
+                10.0
             ],
             "taille": 15.0,
-            "couleur": "white"
+            "type_apparence": "image",
+            "couleur": [
+                255,
+                255,
+                255
+            ],
+            "image": "Bahrain.png"
         },
         {
             "position": [
-                120.0,
-                120.0
+                300.0,
+                300.0
             ],
             "vitesse": [
-                150.0,
-                100.0
+                5.0,
+                1.0
             ],
             "taille": 15.0,
-            "couleur": "white"
+            "type_apparence": "image",
+            "couleur": [
+                255,
+                255,
+                255
+            ],
+            "image": "Austria.png"
         }
     ],
     "cercles": [
@@ -44,24 +60,16 @@
                 300.0,
                 300.0
             ],
-            "rayon": 80.0,
-            "couleur": "blue",
-            "life": 20,
-            "angle_ouverture": 40.0,
-            "angle_rotation_initial": 0.0,
-            "vitesse_rotation": 10.0
-        },
-        {
-            "position": [
-                350.0,
-                350.0
-            ],
             "rayon": 100.0,
-            "couleur": "blue",
+            "couleur": [
+                84,
+                108,
+                222
+            ],
             "life": 20,
             "angle_ouverture": 40.0,
             "angle_rotation_initial": 0.0,
-            "vitesse_rotation": 10.0
+            "vitesse_rotation": 30.0
         }
     ]
 }
