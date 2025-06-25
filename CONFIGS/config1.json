@@ -33,7 +33,9 @@
                 255,
                 255
             ],
-            "image": "Bahrain.png"
+            "image": "Bahrain.png",
+            "coef_rebondissement": 0.54,
+            "coef_gravite": 1.68
         },
         {
             "position": [
@@ -51,7 +53,29 @@
                 255,
                 255
             ],
-            "image": "Austria.png"
+            "image": "Austria.png",
+            "coef_rebondissement": 0.8,
+            "coef_gravite": 1.0
+        },
+        {
+            "position": [
+                100,
+                100
+            ],
+            "vitesse": [
+                150,
+                100
+            ],
+            "taille": 15,
+            "type_apparence": "couleur",
+            "couleur": [
+                255,
+                255,
+                255
+            ],
+            "image": "",
+            "coef_rebondissement": 0.8,
+            "coef_gravite": 1.0
         }
     ],
     "cercles": [

@@ -7,6 +7,7 @@ from typing import Dict, List, Any
 import copy
 from PIL import Image, ImageTk
 import colorsys
+import math
 
 
 class ColorManager:
@@ -208,6 +209,225 @@ class ColorPicker:
             self.set_color(color["rgb"])
             if self.callback:
                 self.callback(color["rgb"])
+
+
+class CercleCloneDialog:
+    """Dialogue pour le clonage avancé de cercles"""
+
+    def __init__(self, parent, cercle_original):
+        self.parent = parent
+        self.cercle_original = copy.deepcopy(cercle_original)
+        self.result = None
+
+        self.dialog = tk.Toplevel(parent.root)
+        self.dialog.title("Clonage avancé de cercle")
+        self.dialog.geometry("500x400")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent.root)
+        self.dialog.grab_set()
+
+        self.vars = {}
+        self.create_widgets()
+        self.center_dialog()
+
+    def create_widgets(self):
+        """Crée les widgets du dialogue"""
+        main_frame = ttk.Frame(self.dialog, padding=10)
+        main_frame.pack(fill="both", expand=True)
+
+        # Titre
+        title_label = tk.Label(main_frame, text="Clonage avancé de cercle",
+                               font=("Arial", 14, "bold"))
+        title_label.pack(pady=(0, 20))
+
+        # Nombre de clones
+        clone_frame = ttk.LabelFrame(main_frame, text="Nombre de clones", padding=10)
+        clone_frame.pack(fill="x", pady=5)
+
+        tk.Label(clone_frame, text="Nombre de cercles à créer:").grid(row=0, column=0, sticky="w")
+        self.vars['nb_clones'] = tk.IntVar(value=3)
+        tk.Spinbox(clone_frame, from_=1, to=20, textvariable=self.vars['nb_clones'],
+                   width=10).grid(row=0, column=1, padx=(10, 0))
+
+        # Décalages
+        offset_frame = ttk.LabelFrame(main_frame, text="Décalages", padding=10)
+        offset_frame.pack(fill="x", pady=5)
+
+        # Décalage de rotation
+        tk.Label(offset_frame, text="Décalage rotation (degrés):").grid(row=0, column=0, sticky="w")
+        self.vars['decalage_rotation'] = tk.DoubleVar(value=30.0)
+        tk.Spinbox(offset_frame, from_=-180, to=180, textvariable=self.vars['decalage_rotation'],
+                   width=10, increment=15).grid(row=0, column=1, padx=(10, 0))
+
+        # Décalage de distance
+        tk.Label(offset_frame, text="Décalage distance (pixels):").grid(row=1, column=0, sticky="w")
+        self.vars['decalage_distance'] = tk.DoubleVar(value=100.0)
+        tk.Spinbox(offset_frame, from_=0, to=500, textvariable=self.vars['decalage_distance'],
+                   width=10, increment=10).grid(row=1, column=1, padx=(10, 0))
+
+        # Mode de disposition
+        layout_frame = ttk.LabelFrame(main_frame, text="Disposition", padding=10)
+        layout_frame.pack(fill="x", pady=5)
+
+        self.vars['mode_disposition'] = tk.StringVar(value="cercle")
+        tk.Radiobutton(layout_frame, text="En cercle autour de l'original",
+                       variable=self.vars['mode_disposition'], value="cercle").pack(anchor="w")
+        tk.Radiobutton(layout_frame, text="En ligne droite",
+                       variable=self.vars['mode_disposition'], value="ligne").pack(anchor="w")
+        tk.Radiobutton(layout_frame, text="En grille",
+                       variable=self.vars['mode_disposition'], value="grille").pack(anchor="w")
+
+        # Décalage de couleur
+        color_frame = ttk.LabelFrame(main_frame, text="Décalage de couleur", padding=10)
+        color_frame.pack(fill="x", pady=5)
+
+        self.vars['fondu_couleur'] = tk.BooleanVar(value=True)
+        tk.Checkbutton(color_frame, text="Activer le dégradé de couleur",
+                       variable=self.vars['fondu_couleur']).pack(anchor="w")
+
+        tk.Label(color_frame, text="Intensité du dégradé:").pack(anchor="w")
+        self.vars['intensite_fondu'] = tk.DoubleVar(value=0.3)
+        tk.Scale(color_frame, from_=0.0, to=1.0, resolution=0.05, orient="horizontal",
+                 variable=self.vars['intensite_fondu'], length=300).pack(fill="x")
+
+        # Boutons
+        buttons_frame = tk.Frame(main_frame)
+        buttons_frame.pack(pady=20)
+
+        tk.Button(buttons_frame, text="✅ Créer les clones", command=self.create_clones,
+                  bg="lightgreen", font=("Arial", 10, "bold")).pack(side="left", padx=5)
+        tk.Button(buttons_frame, text="❌ Annuler", command=self.cancel,
+                  bg="lightcoral").pack(side="left", padx=5)
+
+        # Aperçu
+        preview_frame = ttk.LabelFrame(main_frame, text="Aperçu", padding=5)
+        preview_frame.pack(fill="x", pady=5)
+
+        self.preview_canvas = tk.Canvas(preview_frame, width=300, height=100, bg="black")
+        self.preview_canvas.pack()
+
+        # Mettre à jour l'aperçu quand les valeurs changent
+        for var in self.vars.values():
+            if hasattr(var, 'trace'):
+                var.trace('w', self.update_preview)
+
+        self.update_preview()
+
+    def center_dialog(self):
+        """Centre le dialogue sur l'écran"""
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (400 // 2)
+        self.dialog.geometry(f"+{x}+{y}")
+
+    def update_preview(self, *args):
+        """Met à jour l'aperçu visuel"""
+        self.preview_canvas.delete("all")
+
+        # Centre du canvas
+        cx, cy = 150, 50
+
+        # Dessiner l'original en blanc
+        self.preview_canvas.create_oval(cx - 8, cy - 8, cx + 8, cy + 8,
+                                        fill="white", outline="gray")
+
+        nb_clones = self.vars['nb_clones'].get()
+        mode = self.vars['mode_disposition'].get()
+        distance = self.vars['decalage_distance'].get() * 0.3  # Échelle réduite
+        rotation = self.vars['decalage_rotation'].get()
+
+        couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+
+        for i in range(nb_clones):
+            if mode == "cercle":
+                # Disposition en cercle
+                angle = math.radians(rotation * i)
+                x = cx + distance * math.cos(angle)
+                y = cy + distance * math.sin(angle)
+            elif mode == "ligne":
+                # Disposition en ligne
+                angle = math.radians(rotation)
+                x = cx + (distance * (i + 1)) * math.cos(angle)
+                y = cy + (distance * (i + 1)) * math.sin(angle)
+            else:  # grille
+                cols = int(math.sqrt(nb_clones)) + 1
+                row = i // cols
+                col = i % cols
+                x = cx + col * (distance * 0.5)
+                y = cy + row * (distance * 0.5)
+
+            # Calculer la couleur avec dégradé
+            if self.vars['fondu_couleur'].get():
+                intensite = self.vars['intensite_fondu'].get()
+                factor = i / max(1, nb_clones - 1) * intensite
+
+                # Appliquer le dégradé
+                r = max(0, min(255, int(couleur_orig[0] * (1 - factor) + 128 * factor)))
+                g = max(0, min(255, int(couleur_orig[1] * (1 - factor) + 128 * factor)))
+                b = max(0, min(255, int(couleur_orig[2] * (1 - factor) + 255 * factor)))
+                color = f"#{r:02x}{g:02x}{b:02x}"
+            else:
+                color = f"#{couleur_orig[0]:02x}{couleur_orig[1]:02x}{couleur_orig[2]:02x}"
+
+            self.preview_canvas.create_oval(x - 6, y - 6, x + 6, y + 6,
+                                            fill=color, outline="gray")
+
+    def create_clones(self):
+        """Crée les cercles clonés"""
+        nb_clones = self.vars['nb_clones'].get()
+        mode = self.vars['mode_disposition'].get()
+        distance = self.vars['decalage_distance'].get()
+        rotation = self.vars['decalage_rotation'].get()
+
+        clones = []
+        couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+        pos_orig = self.cercle_original["position"]
+
+        for i in range(nb_clones):
+            clone = copy.deepcopy(self.cercle_original)
+
+            # Calculer la nouvelle position
+            if mode == "cercle":
+                angle = math.radians(rotation * i)
+                clone["position"][0] = pos_orig[0] + distance * math.cos(angle)
+                clone["position"][1] = pos_orig[1] + distance * math.sin(angle)
+            elif mode == "ligne":
+                angle = math.radians(rotation)
+                clone["position"][0] = pos_orig[0] + (distance * (i + 1)) * math.cos(angle)
+                clone["position"][1] = pos_orig[1] + (distance * (i + 1)) * math.sin(angle)
+            else:  # grille
+                cols = int(math.sqrt(nb_clones)) + 1
+                row = i // cols
+                col = i % cols
+                clone["position"][0] = pos_orig[0] + col * distance
+                clone["position"][1] = pos_orig[1] + row * distance
+
+            # Appliquer le dégradé de couleur
+            if self.vars['fondu_couleur'].get():
+                intensite = self.vars['intensite_fondu'].get()
+                factor = i / max(1, nb_clones - 1) * intensite
+
+                # Créer un dégradé vers une couleur complémentaire
+                h, s, v = colorsys.rgb_to_hsv(couleur_orig[0] / 255, couleur_orig[1] / 255, couleur_orig[2] / 255)
+                h = (h + factor * 0.5) % 1.0  # Décalage de teinte
+                s = max(0.3, s * (1 - factor * 0.3))  # Réduction de saturation
+                v = min(1.0, v * (1 + factor * 0.2))  # Augmentation de luminosité
+
+                r, g, b = colorsys.hsv_to_rgb(h, s, v)
+                clone["couleur"] = [int(r * 255), int(g * 255), int(b * 255)]
+
+            # Décaler légèrement la rotation initiale
+            clone["angle_rotation_initial"] = (clone["angle_rotation_initial"] + rotation * i) % 360
+
+            clones.append(clone)
+
+        self.result = clones
+        self.dialog.destroy()
+
+    def cancel(self):
+        """Annule le dialogue"""
+        self.result = None
+        self.dialog.destroy()
 
 
 class ConfigEditor:
@@ -486,6 +706,22 @@ class ConfigEditor:
             row=row, column=1, padx=5)
         row += 1
 
+        # Coefficients physiques
+        physics_frame = ttk.LabelFrame(scrollable_balle_frame, text="Coefficients physiques", padding=5)
+        physics_frame.grid(row=row, column=0, columnspan=4, sticky="ew", pady=5)
+
+        tk.Label(physics_frame, text="Coefficient rebondissement:").grid(row=0, column=0, sticky="w")
+        self.balle_vars['coef_rebondissement'] = tk.DoubleVar(value=0.8)
+        tk.Scale(physics_frame, from_=0.0, to=1.0, resolution=0.01, orient="horizontal",
+                 variable=self.balle_vars['coef_rebondissement'], length=150).grid(row=0, column=1, padx=5)
+
+        tk.Label(physics_frame, text="Coefficient gravité:").grid(row=1, column=0, sticky="w")
+        self.balle_vars['coef_gravite'] = tk.DoubleVar(value=1.0)
+        tk.Scale(physics_frame, from_=0.0, to=3.0, resolution=0.01, orient="horizontal",
+                 variable=self.balle_vars['coef_gravite'], length=150).grid(row=1, column=1, padx=5)
+
+        row += 1
+
         # Type d'apparence (couleur ou image)
         apparence_frame = ttk.LabelFrame(scrollable_balle_frame, text="Apparence", padding=5)
         apparence_frame.grid(row=row, column=0, columnspan=4, sticky="ew", pady=5)
@@ -555,8 +791,8 @@ class ConfigEditor:
                                                                                                           padx=2)
         tk.Button(cercles_buttons_frame, text="❌ Supprimer", command=self.delete_cercle, bg="lightcoral").pack(
             side="left", padx=2)
-        tk.Button(cercles_buttons_frame, text="📋 Dupliquer", command=self.duplicate_cercle, bg="lightyellow").pack(
-            side="left", padx=2)
+        tk.Button(cercles_buttons_frame, text="🎭 Cloner avancé", command=self.duplicate_cercle,
+                  bg="lightblue").pack(side="left", padx=2)
 
         # Frame droite - Édition de cercle
         right_frame = ttk.LabelFrame(frame, text="Édition de cercle", padding=5)
@@ -658,12 +894,20 @@ class ConfigEditor:
         scrollbar_cercle.pack(side="right", fill="y")
 
     def create_preview_tab(self):
-        """Crée l'onglet de prévisualisation"""
+        """Crée l'onglet de prévisualisation amélioré"""
         frame = ttk.Frame(self.notebook)
         self.notebook.add(frame, text="👁️ Aperçu")
 
+        # Créer un notebook pour séparer JSON et visualisation
+        preview_notebook = ttk.Notebook(frame)
+        preview_notebook.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Onglet JSON
+        json_frame = ttk.Frame(preview_notebook)
+        preview_notebook.add(json_frame, text="📄 Configuration JSON")
+
         # Zone de texte pour afficher la configuration JSON
-        text_frame = ttk.LabelFrame(frame, text="Configuration JSON", padding=5)
+        text_frame = ttk.LabelFrame(json_frame, text="Configuration JSON", padding=5)
         text_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Zone de texte avec scrollbar
@@ -677,8 +921,56 @@ class ConfigEditor:
         self.preview_text.pack(side="left", fill="both", expand=True)
         scrollbar_preview.pack(side="right", fill="y")
 
-        # Bouton de rafraîchissement
-        tk.Button(text_frame, text="🔄 Rafraîchir l'aperçu", command=self.refresh_preview, bg="lightblue").pack(pady=5)
+        # Bouton de rafraîchissement JSON
+        tk.Button(text_frame, text="🔄 Rafraîchir JSON", command=self.refresh_preview,
+                  bg="lightblue").pack(pady=5)
+
+        # Onglet Visualisation
+        visual_frame = ttk.Frame(preview_notebook)
+        preview_notebook.add(visual_frame, text="🎮 Visualisation t=0")
+
+        # Frame pour la visualisation
+        viz_frame = ttk.LabelFrame(visual_frame, text="Aperçu visuel de la configuration", padding=5)
+        viz_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Canvas pour dessiner la prévisualisation
+        canvas_frame = tk.Frame(viz_frame)
+        canvas_frame.pack(fill="both", expand=True)
+
+        self.visual_canvas = tk.Canvas(canvas_frame, bg="black", width=600, height=400)
+        v_scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.visual_canvas.yview)
+        h_scrollbar = ttk.Scrollbar(canvas_frame, orient="horizontal", command=self.visual_canvas.xview)
+
+        self.visual_canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+
+        self.visual_canvas.pack(side="left", fill="both", expand=True)
+        v_scrollbar.pack(side="right", fill="y")
+        h_scrollbar.pack(side="bottom", fill="x")
+
+        # Contrôles de la visualisation
+        controls_frame = tk.Frame(viz_frame)
+        controls_frame.pack(fill="x", pady=5)
+
+        tk.Button(controls_frame, text="🔄 Rafraîchir visualisation",
+                  command=self.refresh_visual_preview, bg="lightgreen").pack(side="left", padx=5)
+
+        # Échelle
+        tk.Label(controls_frame, text="Échelle:").pack(side="left", padx=(20, 5))
+        self.scale_var = tk.DoubleVar(value=0.5)
+        tk.Scale(controls_frame, from_=0.1, to=2.0, resolution=0.1, orient="horizontal",
+                 variable=self.scale_var, command=self.on_scale_change, length=150).pack(side="left")
+
+        # Options d'affichage
+        tk.Label(controls_frame, text="Affichage:").pack(side="left", padx=(20, 5))
+        self.show_trajectories = tk.BooleanVar(value=True)
+        tk.Checkbutton(controls_frame, text="Trajectoires",
+                       variable=self.show_trajectories,
+                       command=self.refresh_visual_preview).pack(side="left")
+
+        self.show_vectors = tk.BooleanVar(value=True)
+        tk.Checkbutton(controls_frame, text="Vecteurs vitesse",
+                       variable=self.show_vectors,
+                       command=self.refresh_visual_preview).pack(side="left")
 
     # === MÉTHODES UTILITAIRES ===
 
@@ -720,6 +1012,141 @@ class ConfigEditor:
         images = self.color_manager.get_images_list()
         self.balle_image_combo['values'] = images
 
+    def on_scale_change(self, value=None):
+        """Appelé quand l'échelle change"""
+        self.refresh_visual_preview()
+
+    def refresh_visual_preview(self):
+        """Rafraîchit la prévisualisation visuelle"""
+        self.visual_canvas.delete("all")
+
+        # Récupérer les dimensions de l'écran configuré
+        largeur_ecran = self.config["ecran"]["taille"][0]
+        hauteur_ecran = self.config["ecran"]["taille"][1]
+        couleur_fond = self.config["ecran"]["couleur_fond"]
+
+        scale = self.scale_var.get()
+
+        # Redimensionner le canvas
+        canvas_width = int(largeur_ecran * scale)
+        canvas_height = int(hauteur_ecran * scale)
+        self.visual_canvas.configure(width=min(600, canvas_width),
+                                     height=min(400, canvas_height),
+                                     scrollregion=(0, 0, canvas_width, canvas_height))
+
+        # Couleur de fond
+        fond_hex = f"#{couleur_fond[0]:02x}{couleur_fond[1]:02x}{couleur_fond[2]:02x}"
+        self.visual_canvas.configure(bg=fond_hex)
+
+        # Dessiner les cercles
+        for i, cercle in enumerate(self.config["cercles"]):
+            x = cercle["position"][0] * scale
+            y = cercle["position"][1] * scale
+            rayon = cercle["rayon"] * scale
+            couleur = cercle["couleur"]
+            couleur_hex = f"#{couleur[0]:02x}{couleur[1]:02x}{couleur[2]:02x}"
+
+            # Calculer les angles pour l'ouverture
+            angle_rot = math.radians(cercle["angle_rotation_initial"])
+            angle_ouverture = math.radians(cercle["angle_ouverture"])
+
+            if cercle["angle_ouverture"] >= 360:
+                # Cercle complet
+                self.visual_canvas.create_oval(x - rayon, y - rayon, x + rayon, y + rayon,
+                                               outline=couleur_hex, width=2, fill="")
+            else:
+                # Arc de cercle
+                start_angle = math.degrees(angle_rot - angle_ouverture / 2)
+                extent_angle = math.degrees(angle_ouverture)
+
+                self.visual_canvas.create_arc(x - rayon, y - rayon, x + rayon, y + rayon,
+                                              start=start_angle, extent=extent_angle,
+                                              outline=couleur_hex, width=3, style="arc")
+
+            # Étiquette du cercle
+            self.visual_canvas.create_text(x, y - rayon - 15, text=f"C{i + 1}",
+                                           fill="white", font=("Arial", 8, "bold"))
+
+        # Dessiner les balles
+        for i, balle in enumerate(self.config["balles"]):
+            x = balle["position"][0] * scale
+            y = balle["position"][1] * scale
+            taille = balle["taille"] * scale
+
+            # Couleur ou image
+            if balle.get("type_apparence", "couleur") == "couleur":
+                couleur = balle["couleur"]
+                couleur_hex = f"#{couleur[0]:02x}{couleur[1]:02x}{couleur[2]:02x}"
+                self.visual_canvas.create_oval(x - taille, y - taille, x + taille, y + taille,
+                                               fill=couleur_hex, outline="white", width=1)
+            else:
+                # Pour les images, dessiner un cercle avec motif
+                self.visual_canvas.create_oval(x - taille, y - taille, x + taille, y + taille,
+                                               fill="gray", outline="white", width=1)
+                self.visual_canvas.create_text(x, y, text="IMG", fill="black", font=("Arial", 6))
+
+            # Étiquette de la balle
+            self.visual_canvas.create_text(x, y + taille + 10, text=f"B{i + 1}",
+                                           fill="white", font=("Arial", 8, "bold"))
+
+            # Vecteur vitesse si activé
+            if self.show_vectors.get():
+                vx, vy = balle["vitesse"]
+                # Normaliser le vecteur pour l'affichage
+                factor = scale * 0.1
+                end_x = x + vx * factor
+                end_y = y + vy * factor
+
+                self.visual_canvas.create_line(x, y, end_x, end_y,
+                                               fill="yellow", width=2, arrow=tk.LAST)
+
+            # Trajectoire approximative si activée
+            if self.show_trajectories.get():
+                vx, vy = balle["vitesse"]
+                coef_grav = balle.get("coef_gravite", 1.0)
+
+                # Simuler quelques points de trajectoire
+                points = [x, y]
+                curr_x, curr_y = x, y
+                curr_vx, curr_vy = vx * scale * 0.1, vy * scale * 0.1
+
+                for step in range(20):
+                    curr_x += curr_vx
+                    curr_y += curr_vy
+                    curr_vy += coef_grav * 0.5  # Gravité approximative
+
+                    points.extend([curr_x, curr_y])
+
+                    # Arrêter si on sort de l'écran
+                    if (curr_x < 0 or curr_x > canvas_width or
+                            curr_y < 0 or curr_y > canvas_height):
+                        break
+
+                if len(points) > 4:
+                    self.visual_canvas.create_line(points, fill="cyan", width=1,
+                                                   dash=(2, 2), smooth=True)
+
+        # Légende
+        legend_y = 10
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text=f"Échelle: {scale:.1f}x",
+                                       fill="white", font=("Arial", 10, "bold"))
+
+        legend_y += 20
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text=f"Écran: {largeur_ecran}x{hauteur_ecran}",
+                                       fill="white", font=("Arial", 8))
+
+        legend_y += 15
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text=f"Balles: {len(self.config['balles'])}",
+                                       fill="white", font=("Arial", 8))
+
+        legend_y += 15
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text=f"Cercles: {len(self.config['cercles'])}",
+                                       fill="white", font=("Arial", 8))
+
     # === MÉTHODES DE GESTION DES BALLES ===
 
     def add_balle(self):
@@ -730,7 +1157,9 @@ class ConfigEditor:
             "taille": 15,
             "type_apparence": "couleur",
             "couleur": [255, 255, 255],
-            "image": ""
+            "image": "",
+            "coef_rebondissement": 0.8,
+            "coef_gravite": 1.0
         }
         self.config["balles"].append(nouvelle_balle)
         self.refresh_balles_list()
@@ -771,6 +1200,10 @@ class ConfigEditor:
             self.balle_vars['vit_y'].set(balle["vitesse"][1])
             self.balle_vars['taille'].set(balle["taille"])
 
+            # Coefficients physiques (avec valeurs par défaut)
+            self.balle_vars['coef_rebondissement'].set(balle.get("coef_rebondissement", 0.8))
+            self.balle_vars['coef_gravite'].set(balle.get("coef_gravite", 1.0))
+
             # Gestion du type d'apparence
             type_apparence = balle.get("type_apparence", "couleur")
             self.balle_vars['type_apparence'].set(type_apparence)
@@ -799,6 +1232,8 @@ class ConfigEditor:
             balle["vitesse"] = [self.balle_vars['vit_x'].get(), self.balle_vars['vit_y'].get()]
             balle["taille"] = self.balle_vars['taille'].get()
             balle["type_apparence"] = self.balle_vars['type_apparence'].get()
+            balle["coef_rebondissement"] = self.balle_vars['coef_rebondissement'].get()
+            balle["coef_gravite"] = self.balle_vars['coef_gravite'].get()
 
             if balle["type_apparence"] == "couleur":
                 balle["couleur"] = self.balle_color_picker.get_color()
@@ -838,9 +1273,12 @@ class ConfigEditor:
             else:
                 app_info = f"Image: {balle.get('image', 'None')}"
 
+            coef_r = balle.get("coef_rebondissement", 0.8)
+            coef_g = balle.get("coef_gravite", 1.0)
+
             text = f"Balle {i + 1}: pos=({balle['position'][0]:.0f},{balle['position'][1]:.0f}) " \
                    f"v=({balle['vitesse'][0]:.0f},{balle['vitesse'][1]:.0f}) " \
-                   f"taille={balle['taille']:.0f} {app_info}"
+                   f"taille={balle['taille']:.0f} rebond={coef_r:.2f} grav={coef_g:.2f} {app_info}"
             self.balles_listbox.insert(tk.END, text)
 
     # === MÉTHODES DE GESTION DES CERCLES ===
@@ -872,14 +1310,22 @@ class ConfigEditor:
                 self.clear_cercle_fields()
 
     def duplicate_cercle(self):
-        """Duplique le cercle sélectionné"""
+        """Ouvre le dialogue de clonage avancé pour le cercle sélectionné"""
         if self.selected_cercle_index is not None:
-            cercle_original = copy.deepcopy(self.config["cercles"][self.selected_cercle_index])
-            # Décaler légèrement la position
-            cercle_original["position"][0] += 50
-            cercle_original["position"][1] += 50
-            self.config["cercles"].append(cercle_original)
-            self.refresh_cercles_list()
+            cercle_original = self.config["cercles"][self.selected_cercle_index]
+
+            # Ouvrir le dialogue de clonage
+            dialog = CercleCloneDialog(self, cercle_original)
+            self.root.wait_window(dialog.dialog)
+
+            # Si des clones ont été créés, les ajouter
+            if dialog.result:
+                for clone in dialog.result:
+                    self.config["cercles"].append(clone)
+
+                self.refresh_cercles_list()
+                messagebox.showinfo("Succès",
+                                    f"{len(dialog.result)} cercle(s) cloné(s) avec succès !")
 
     def on_cercle_selected(self, event):
         """Gère la sélection d'un cercle dans la liste"""
@@ -1087,6 +1533,7 @@ class ConfigEditor:
         self.refresh_config_list()
         self.refresh_preview()
         self.refresh_images_list()
+        self.refresh_visual_preview()
 
     def launch_game(self):
         """Lance le jeu avec la configuration actuelle"""
