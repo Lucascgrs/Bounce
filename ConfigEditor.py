@@ -221,7 +221,7 @@ class CercleCloneDialog:
 
         self.dialog = tk.Toplevel(parent.root)
         self.dialog.title("Clonage avancé de cercle")
-        self.dialog.geometry("500x400")
+        self.dialog.geometry("580x650")  # Augmenter encore la hauteur
         self.dialog.resizable(False, False)
         self.dialog.transient(parent.root)
         self.dialog.grab_set()
@@ -229,6 +229,36 @@ class CercleCloneDialog:
         self.vars = {}
         self.create_widgets()
         self.center_dialog()
+
+    def save_and_apply_to_original(self):
+        """Sauvegarde et applique les modifications à l'original avant clonage"""
+        try:
+            # Récupérer les valeurs modifiées
+            nb_clones = self.vars['nb_clones'].get()
+            distance = self.vars['decalage_distance'].get()
+            rotation = self.vars['decalage_rotation'].get()
+
+            # Modifier l'original selon les paramètres choisis
+            if self.vars['mode_disposition'].get() == "cercle" and nb_clones > 0:
+                # Appliquer une rotation au cercle original
+                angle_rotation_original = math.radians(rotation * -1)  # Rotation inverse pour équilibrer
+                self.cercle_original["angle_rotation_initial"] = (
+                                                                         self.cercle_original.get(
+                                                                             "angle_rotation_initial",
+                                                                             0) + math.degrees(angle_rotation_original)
+                                                                 ) % 360
+
+            # Appliquer les modifications au cercle original dans la configuration
+            cercle_index = self.parent.selected_cercle_index
+            if cercle_index is not None:
+                self.parent.config["cercles"][cercle_index] = copy.deepcopy(self.cercle_original)
+                self.parent.refresh_cercles_list()
+                self.parent.on_cercle_selected(None)  # Recharger l'affichage
+
+            messagebox.showinfo("Succès", "Modifications appliquées au cercle original !")
+
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
 
     def create_widgets(self):
         """Crée les widgets du dialogue"""
@@ -247,7 +277,7 @@ class CercleCloneDialog:
         tk.Label(clone_frame, text="Nombre de cercles à créer:").grid(row=0, column=0, sticky="w")
         self.vars['nb_clones'] = tk.IntVar(value=3)
         tk.Spinbox(clone_frame, from_=1, to=20, textvariable=self.vars['nb_clones'],
-                   width=10).grid(row=0, column=1, padx=(10, 0))
+                   width=10, command=self.update_preview).grid(row=0, column=1, padx=(10, 0))
 
         # Décalages
         offset_frame = ttk.LabelFrame(main_frame, text="Décalages", padding=10)
@@ -256,14 +286,20 @@ class CercleCloneDialog:
         # Décalage de rotation
         tk.Label(offset_frame, text="Décalage rotation (degrés):").grid(row=0, column=0, sticky="w")
         self.vars['decalage_rotation'] = tk.DoubleVar(value=30.0)
-        tk.Spinbox(offset_frame, from_=-180, to=180, textvariable=self.vars['decalage_rotation'],
-                   width=10, increment=15).grid(row=0, column=1, padx=(10, 0))
+        rotation_spinbox = tk.Spinbox(offset_frame, from_=-180, to=180,
+                                      textvariable=self.vars['decalage_rotation'],
+                                      width=10, increment=15, command=self.update_preview)
+        rotation_spinbox.grid(row=0, column=1, padx=(10, 0))
+        rotation_spinbox.bind('<KeyRelease>', lambda e: self.update_preview())
 
         # Décalage de distance
         tk.Label(offset_frame, text="Décalage distance (pixels):").grid(row=1, column=0, sticky="w")
         self.vars['decalage_distance'] = tk.DoubleVar(value=100.0)
-        tk.Spinbox(offset_frame, from_=0, to=500, textvariable=self.vars['decalage_distance'],
-                   width=10, increment=10).grid(row=1, column=1, padx=(10, 0))
+        distance_spinbox = tk.Spinbox(offset_frame, from_=0, to=500,
+                                      textvariable=self.vars['decalage_distance'],
+                                      width=10, increment=10, command=self.update_preview)
+        distance_spinbox.grid(row=1, column=1, padx=(10, 0))
+        distance_spinbox.bind('<KeyRelease>', lambda e: self.update_preview())
 
         # Mode de disposition
         layout_frame = ttk.LabelFrame(main_frame, text="Disposition", padding=10)
@@ -271,158 +307,217 @@ class CercleCloneDialog:
 
         self.vars['mode_disposition'] = tk.StringVar(value="cercle")
         tk.Radiobutton(layout_frame, text="En cercle autour de l'original",
-                       variable=self.vars['mode_disposition'], value="cercle").pack(anchor="w")
+                       variable=self.vars['mode_disposition'], value="cercle",
+                       command=self.update_preview).pack(anchor="w")
         tk.Radiobutton(layout_frame, text="En ligne droite",
-                       variable=self.vars['mode_disposition'], value="ligne").pack(anchor="w")
+                       variable=self.vars['mode_disposition'], value="ligne",
+                       command=self.update_preview).pack(anchor="w")
         tk.Radiobutton(layout_frame, text="En grille",
-                       variable=self.vars['mode_disposition'], value="grille").pack(anchor="w")
+                       variable=self.vars['mode_disposition'], value="grille",
+                       command=self.update_preview).pack(anchor="w")
 
-        # Décalage de couleur
-        color_frame = ttk.LabelFrame(main_frame, text="Décalage de couleur", padding=10)
+        # Décalage de couleur AMÉLIORÉ
+        color_frame = ttk.LabelFrame(main_frame, text="Dégradé de couleur", padding=10)
         color_frame.pack(fill="x", pady=5)
 
         self.vars['fondu_couleur'] = tk.BooleanVar(value=True)
         tk.Checkbutton(color_frame, text="Activer le dégradé de couleur",
-                       variable=self.vars['fondu_couleur']).pack(anchor="w")
+                       variable=self.vars['fondu_couleur'],
+                       command=self.update_preview).pack(anchor="w")
 
-        tk.Label(color_frame, text="Intensité du dégradé:").pack(anchor="w")
-        self.vars['intensite_fondu'] = tk.DoubleVar(value=0.3)
-        tk.Scale(color_frame, from_=0.0, to=1.0, resolution=0.05, orient="horizontal",
-                 variable=self.vars['intensite_fondu'], length=300).pack(fill="x")
+        # Frame pour les couleurs
+        colors_frame = tk.Frame(color_frame)
+        colors_frame.pack(fill="x", pady=10)
 
-        # Boutons
+        # Couleur source (couleur du cercle original)
+        tk.Label(colors_frame, text="Couleur source:").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+        self.source_color_display = tk.Frame(colors_frame, width=40, height=25,
+                                             bg=f"#{couleur_orig[0]:02x}{couleur_orig[1]:02x}{couleur_orig[2]:02x}",
+                                             relief="sunken", bd=2)
+        self.source_color_display.grid(row=0, column=1, padx=(0, 20))
+        self.source_color_display.pack_propagate(False)
+
+        # Couleur cible (sélectionnable)
+        tk.Label(colors_frame, text="Couleur cible:").grid(row=0, column=2, sticky="w", padx=(0, 10))
+        self.vars['couleur_cible'] = [0, 255, 255]  # Cyan par défaut
+        self.target_color_display = tk.Frame(colors_frame, width=40, height=25,
+                                             bg="#00ffff", relief="sunken", bd=2)
+        self.target_color_display.grid(row=0, column=3, padx=(0, 10))
+        self.target_color_display.pack_propagate(False)
+
+        tk.Button(colors_frame, text="🎨 Choisir", command=self.choose_target_color).grid(row=0, column=4)
+
+        # Intensité du dégradé
+        tk.Label(color_frame, text="Intensité du dégradé:").pack(anchor="w", pady=(10, 0))
+        self.vars['intensite_fondu'] = tk.DoubleVar(value=0.8)
+        intensity_scale = tk.Scale(color_frame, from_=0.0, to=1.0, resolution=0.05, orient="horizontal",
+                                   variable=self.vars['intensite_fondu'], length=400,
+                                   command=lambda x: self.update_preview())
+        intensity_scale.pack(fill="x")
+
+        # Aperçu
+        preview_frame = ttk.LabelFrame(main_frame, text="Aperçu", padding=5)
+        preview_frame.pack(fill="x", pady=10)
+
+        self.preview_canvas = tk.Canvas(preview_frame, width=500, height=140, bg="black")
+        self.preview_canvas.pack()
+
+        # Boutons (version modifiée)
         buttons_frame = tk.Frame(main_frame)
         buttons_frame.pack(pady=20)
 
+        tk.Button(buttons_frame, text="💾 Sauvegarder sur original",
+                  command=self.save_and_apply_to_original,
+                  bg="lightblue", font=("Arial", 9)).pack(side="left", padx=5)
         tk.Button(buttons_frame, text="✅ Créer les clones", command=self.create_clones,
                   bg="lightgreen", font=("Arial", 10, "bold")).pack(side="left", padx=5)
         tk.Button(buttons_frame, text="❌ Annuler", command=self.cancel,
                   bg="lightcoral").pack(side="left", padx=5)
 
-        # Aperçu
-        preview_frame = ttk.LabelFrame(main_frame, text="Aperçu", padding=5)
-        preview_frame.pack(fill="x", pady=5)
+        # Initialiser l'aperçu
+        self.dialog.after(100, self.update_preview)
 
-        self.preview_canvas = tk.Canvas(preview_frame, width=300, height=100, bg="black")
-        self.preview_canvas.pack()
-
-        # Mettre à jour l'aperçu quand les valeurs changent
-        for var in self.vars.values():
-            if hasattr(var, 'trace'):
-                var.trace('w', self.update_preview)
-
-        self.update_preview()
+    def choose_target_color(self):
+        """Ouvre un sélecteur de couleur pour la couleur cible"""
+        current_color = f"#{self.vars['couleur_cible'][0]:02x}{self.vars['couleur_cible'][1]:02x}{self.vars['couleur_cible'][2]:02x}"
+        color = colorchooser.askcolor(color=current_color, title="Choisir la couleur cible du dégradé")
+        if color[0]:  # Si une couleur a été choisie
+            rgb = [int(c) for c in color[0]]
+            self.vars['couleur_cible'] = rgb
+            # Mettre à jour l'affichage
+            color_hex = f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+            self.target_color_display.configure(bg=color_hex)
+            self.update_preview()
 
     def center_dialog(self):
         """Centre le dialogue sur l'écran"""
         self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - (500 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (400 // 2)
+        x = (self.dialog.winfo_screenwidth() // 2) - (580 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (650 // 2)
         self.dialog.geometry(f"+{x}+{y}")
 
     def update_preview(self, *args):
         """Met à jour l'aperçu visuel"""
-        self.preview_canvas.delete("all")
+        try:
+            self.preview_canvas.delete("all")
 
-        # Centre du canvas
-        cx, cy = 150, 50
+            # Centre du canvas
+            cx, cy = 250, 70
 
-        # Dessiner l'original en blanc
-        self.preview_canvas.create_oval(cx - 8, cy - 8, cx + 8, cy + 8,
-                                        fill="white", outline="gray")
+            # Dessiner l'original
+            couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+            orig_color = f"#{couleur_orig[0]:02x}{couleur_orig[1]:02x}{couleur_orig[2]:02x}"
+            self.preview_canvas.create_oval(cx - 12, cy - 12, cx + 12, cy + 12,
+                                            fill="", outline=orig_color, width=3)
+            self.preview_canvas.create_text(cx, cy - 30, text="Original", fill="white", font=("Arial", 9, "bold"))
 
-        nb_clones = self.vars['nb_clones'].get()
-        mode = self.vars['mode_disposition'].get()
-        distance = self.vars['decalage_distance'].get() * 0.3  # Échelle réduite
-        rotation = self.vars['decalage_rotation'].get()
+            nb_clones = self.vars['nb_clones'].get()
+            mode = self.vars['mode_disposition'].get()
+            distance = self.vars['decalage_distance'].get() * 0.15  # Échelle réduite pour l'aperçu
+            rotation = self.vars['decalage_rotation'].get()
 
-        couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+            for i in range(min(nb_clones, 12)):  # Limiter l'aperçu à 12 cercles
+                if mode == "cercle":
+                    angle = math.radians(rotation * i)
+                    x = cx + distance * math.cos(angle)
+                    y = cy + distance * math.sin(angle)
+                elif mode == "ligne":
+                    angle = math.radians(rotation)
+                    x = cx + (distance * (i + 1)) * math.cos(angle)
+                    y = cy + (distance * (i + 1)) * math.sin(angle)
+                else:  # grille
+                    cols = int(math.sqrt(nb_clones)) + 1
+                    row = i // cols
+                    col = i % cols
+                    x = cx + col * (distance * 0.8) - (cols * distance * 0.4)
+                    y = cy + row * (distance * 0.8) - 30
 
-        for i in range(nb_clones):
-            if mode == "cercle":
-                # Disposition en cercle
-                angle = math.radians(rotation * i)
-                x = cx + distance * math.cos(angle)
-                y = cy + distance * math.sin(angle)
-            elif mode == "ligne":
-                # Disposition en ligne
-                angle = math.radians(rotation)
-                x = cx + (distance * (i + 1)) * math.cos(angle)
-                y = cy + (distance * (i + 1)) * math.sin(angle)
-            else:  # grille
-                cols = int(math.sqrt(nb_clones)) + 1
-                row = i // cols
-                col = i % cols
-                x = cx + col * (distance * 0.5)
-                y = cy + row * (distance * 0.5)
+                # Calculer la couleur avec dégradé entre couleur source et cible
+                if self.vars['fondu_couleur'].get():
+                    intensite = self.vars['intensite_fondu'].get()
+                    factor = (i / max(1, nb_clones - 1)) * intensite
 
-            # Calculer la couleur avec dégradé
-            if self.vars['fondu_couleur'].get():
-                intensite = self.vars['intensite_fondu'].get()
-                factor = i / max(1, nb_clones - 1) * intensite
+                    couleur_cible = self.vars['couleur_cible']
 
-                # Appliquer le dégradé
-                r = max(0, min(255, int(couleur_orig[0] * (1 - factor) + 128 * factor)))
-                g = max(0, min(255, int(couleur_orig[1] * (1 - factor) + 128 * factor)))
-                b = max(0, min(255, int(couleur_orig[2] * (1 - factor) + 255 * factor)))
-                color = f"#{r:02x}{g:02x}{b:02x}"
-            else:
-                color = f"#{couleur_orig[0]:02x}{couleur_orig[1]:02x}{couleur_orig[2]:02x}"
+                    # Interpolation linéaire entre couleur source et cible
+                    r = int(couleur_orig[0] * (1 - factor) + couleur_cible[0] * factor)
+                    g = int(couleur_orig[1] * (1 - factor) + couleur_cible[1] * factor)
+                    b = int(couleur_orig[2] * (1 - factor) + couleur_cible[2] * factor)
 
-            self.preview_canvas.create_oval(x - 6, y - 6, x + 6, y + 6,
-                                            fill=color, outline="gray")
+                    color = f"#{r:02x}{g:02x}{b:02x}"
+                else:
+                    color = orig_color
+
+                # S'assurer que le cercle reste dans le canvas
+                if 20 <= x <= 480 and 20 <= y <= 120:
+                    self.preview_canvas.create_oval(x - 10, y - 10, x + 10, y + 10,
+                                                    fill="", outline=color, width=2)
+                    self.preview_canvas.create_text(x, y + 18, text=f"{i + 1}", fill="white", font=("Arial", 8))
+
+            # Afficher le nombre total si > 12
+            if nb_clones > 12:
+                self.preview_canvas.create_text(250, 125, text=f"... et {nb_clones - 12} autres",
+                                                fill="yellow", font=("Arial", 9))
+        except Exception as e:
+            print(f"Erreur dans update_preview: {e}")
 
     def create_clones(self):
         """Crée les cercles clonés"""
-        nb_clones = self.vars['nb_clones'].get()
-        mode = self.vars['mode_disposition'].get()
-        distance = self.vars['decalage_distance'].get()
-        rotation = self.vars['decalage_rotation'].get()
+        try:
+            nb_clones = self.vars['nb_clones'].get()
+            mode = self.vars['mode_disposition'].get()
+            distance = self.vars['decalage_distance'].get()
+            rotation = self.vars['decalage_rotation'].get()
 
-        clones = []
-        couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
-        pos_orig = self.cercle_original["position"]
+            clones = []
+            couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
+            couleur_cible = self.vars['couleur_cible']
+            pos_orig = self.cercle_original["position"]
 
-        for i in range(nb_clones):
-            clone = copy.deepcopy(self.cercle_original)
+            for i in range(nb_clones):
+                clone = copy.deepcopy(self.cercle_original)
 
-            # Calculer la nouvelle position
-            if mode == "cercle":
-                angle = math.radians(rotation * i)
-                clone["position"][0] = pos_orig[0] + distance * math.cos(angle)
-                clone["position"][1] = pos_orig[1] + distance * math.sin(angle)
-            elif mode == "ligne":
-                angle = math.radians(rotation)
-                clone["position"][0] = pos_orig[0] + (distance * (i + 1)) * math.cos(angle)
-                clone["position"][1] = pos_orig[1] + (distance * (i + 1)) * math.sin(angle)
-            else:  # grille
-                cols = int(math.sqrt(nb_clones)) + 1
-                row = i // cols
-                col = i % cols
-                clone["position"][0] = pos_orig[0] + col * distance
-                clone["position"][1] = pos_orig[1] + row * distance
+                # Calculer la nouvelle position
+                if mode == "cercle":
+                    angle = math.radians(rotation * i)
+                    clone["position"][0] = pos_orig[0] + distance * math.cos(angle)
+                    clone["position"][1] = pos_orig[1] + distance * math.sin(angle)
+                elif mode == "ligne":
+                    angle = math.radians(rotation)
+                    clone["position"][0] = pos_orig[0] + (distance * (i + 1)) * math.cos(angle)
+                    clone["position"][1] = pos_orig[1] + (distance * (i + 1)) * math.sin(angle)
+                else:  # grille
+                    cols = int(math.sqrt(nb_clones)) + 1
+                    row = i // cols
+                    col = i % cols
+                    clone["position"][0] = pos_orig[0] + col * distance
+                    clone["position"][1] = pos_orig[1] + row * distance
 
-            # Appliquer le dégradé de couleur
-            if self.vars['fondu_couleur'].get():
-                intensite = self.vars['intensite_fondu'].get()
-                factor = i / max(1, nb_clones - 1) * intensite
+                # CORRECTION : Appliquer le dégradé de couleur entre source et cible
+                if self.vars['fondu_couleur'].get() and nb_clones > 1:
+                    intensite = self.vars['intensite_fondu'].get()
+                    # Factor de 0 (premier clone = couleur originale) à 1 (dernier clone = couleur cible)
+                    factor = (i / (nb_clones - 1)) * intensite
 
-                # Créer un dégradé vers une couleur complémentaire
-                h, s, v = colorsys.rgb_to_hsv(couleur_orig[0] / 255, couleur_orig[1] / 255, couleur_orig[2] / 255)
-                h = (h + factor * 0.5) % 1.0  # Décalage de teinte
-                s = max(0.3, s * (1 - factor * 0.3))  # Réduction de saturation
-                v = min(1.0, v * (1 + factor * 0.2))  # Augmentation de luminosité
+                    # Interpolation linéaire entre couleur source et cible
+                    r = int(couleur_orig[0] * (1 - factor) + couleur_cible[0] * factor)
+                    g = int(couleur_orig[1] * (1 - factor) + couleur_cible[1] * factor)
+                    b = int(couleur_orig[2] * (1 - factor) + couleur_cible[2] * factor)
 
-                r, g, b = colorsys.hsv_to_rgb(h, s, v)
-                clone["couleur"] = [int(r * 255), int(g * 255), int(b * 255)]
+                    # S'assurer que les valeurs sont dans la plage valide
+                    clone["couleur"] = [max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))]
 
-            # Décaler légèrement la rotation initiale
-            clone["angle_rotation_initial"] = (clone["angle_rotation_initial"] + rotation * i) % 360
+                # Décaler légèrement la rotation initiale
+                clone["angle_rotation_initial"] = (clone["angle_rotation_initial"] + rotation * i) % 360
 
-            clones.append(clone)
+                clones.append(clone)
 
-        self.result = clones
-        self.dialog.destroy()
+            self.result = clones
+            self.dialog.destroy()
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la création des clones: {e}")
+            print(f"Erreur détaillée: {e}")
 
     def cancel(self):
         """Annule le dialogue"""
@@ -578,20 +673,23 @@ class ConfigEditor:
         self.screen_color_picker.set_color(self.config['ecran']['couleur_fond'])
         row += 1
 
-        # Options booléennes
+        # Options booléennes avec callbacks
         self.screen_vars['collision_sur_contact'] = tk.BooleanVar(value=self.config['ecran']['collision_sur_contact'])
+        self.screen_vars['collision_sur_contact'].trace('w', self.on_screen_setting_changed)
         tk.Checkbutton(screen_frame, text="Collision sur contact",
                        variable=self.screen_vars['collision_sur_contact']).grid(row=row, column=0, columnspan=2,
                                                                                 sticky="w")
         row += 1
 
         self.screen_vars['brisure_dans_ouverture'] = tk.BooleanVar(value=self.config['ecran']['brisure_dans_ouverture'])
+        self.screen_vars['brisure_dans_ouverture'].trace('w', self.on_screen_setting_changed)
         tk.Checkbutton(screen_frame, text="Brisure dans ouverture",
                        variable=self.screen_vars['brisure_dans_ouverture']).grid(row=row, column=0, columnspan=2,
                                                                                  sticky="w")
         row += 1
 
         self.screen_vars['debug'] = tk.BooleanVar(value=self.config['ecran']['debug'])
+        self.screen_vars['debug'].trace('w', self.on_screen_setting_changed)
         tk.Checkbutton(screen_frame, text="Mode debug", variable=self.screen_vars['debug']).grid(row=row, column=0,
                                                                                                  columnspan=2,
                                                                                                  sticky="w")
@@ -1053,21 +1151,50 @@ class ConfigEditor:
             if cercle["angle_ouverture"] >= 360:
                 # Cercle complet
                 self.visual_canvas.create_oval(x - rayon, y - rayon, x + rayon, y + rayon,
-                                               outline=couleur_hex, width=2, fill="")
+                                               outline=couleur_hex, width=3, fill="")
             else:
-                # Arc de cercle
+                # Dessiner le cercle complet en arrière-plan avec une couleur plus sombre
+                dark_color = f"#{couleur[0] // 3:02x}{couleur[1] // 3:02x}{couleur[2] // 3:02x}"
+                self.visual_canvas.create_oval(x - rayon, y - rayon, x + rayon, y + rayon,
+                                               outline=dark_color, width=1, fill="")
+
+                # Dessiner la partie PLEINE (visible) - c'est la partie où les balles peuvent rebondir
                 start_angle = math.degrees(angle_rot - angle_ouverture / 2)
                 extent_angle = math.degrees(angle_ouverture)
 
-                self.visual_canvas.create_arc(x - rayon, y - rayon, x + rayon, y + rayon,
-                                              start=start_angle, extent=extent_angle,
-                                              outline=couleur_hex, width=3, style="arc")
+                # La partie visible est celle qui n'est PAS l'ouverture
+                if extent_angle < 360:
+                    # Dessiner deux arcs pour représenter la partie solide
+                    # Arc 1: de la fin de l'ouverture au début (dans le sens horaire)
+                    solid_start = start_angle + extent_angle
+                    solid_extent = 360 - extent_angle
 
-            # Étiquette du cercle
-            self.visual_canvas.create_text(x, y - rayon - 15, text=f"C{i + 1}",
+                    if solid_extent > 0:
+                        self.visual_canvas.create_arc(x - rayon, y - rayon, x + rayon, y + rayon,
+                                                      start=solid_start, extent=solid_extent,
+                                                      outline=couleur_hex, width=4, style="arc")
+
+            # Marquer l'ouverture avec des lignes rouges si elle existe
+            if cercle["angle_ouverture"] < 360:
+                start_angle_rad = angle_rot - angle_ouverture / 2
+                end_angle_rad = angle_rot + angle_ouverture / 2
+
+                # Ligne de début d'ouverture
+                start_x = x + rayon * math.cos(start_angle_rad)
+                start_y = y + rayon * math.sin(start_angle_rad)
+                self.visual_canvas.create_line(x, y, start_x, start_y, fill="red", width=2)
+
+                # Ligne de fin d'ouverture
+                end_x = x + rayon * math.cos(end_angle_rad)
+                end_y = y + rayon * math.sin(end_angle_rad)
+                self.visual_canvas.create_line(x, y, end_x, end_y, fill="red", width=2)
+
+            # Étiquette du cercle avec info sur la vie
+            life_info = f"C{i + 1} (vie:{cercle.get('life', 2)})"
+            self.visual_canvas.create_text(x, y - rayon - 15, text=life_info,
                                            fill="white", font=("Arial", 8, "bold"))
 
-        # Dessiner les balles
+        # Dessiner les balles (reste identique)
         for i, balle in enumerate(self.config["balles"]):
             x = balle["position"][0] * scale
             y = balle["position"][1] * scale
@@ -1085,8 +1212,11 @@ class ConfigEditor:
                                                fill="gray", outline="white", width=1)
                 self.visual_canvas.create_text(x, y, text="IMG", fill="black", font=("Arial", 6))
 
-            # Étiquette de la balle
-            self.visual_canvas.create_text(x, y + taille + 10, text=f"B{i + 1}",
+            # Étiquette de la balle avec coefficients
+            coef_r = balle.get("coef_rebondissement", 0.8)
+            coef_g = balle.get("coef_gravite", 1.0)
+            balle_info = f"B{i + 1} (r:{coef_r:.1f} g:{coef_g:.1f})"
+            self.visual_canvas.create_text(x, y + taille + 10, text=balle_info,
                                            fill="white", font=("Arial", 8, "bold"))
 
             # Vecteur vitesse si activé
@@ -1126,7 +1256,7 @@ class ConfigEditor:
                     self.visual_canvas.create_line(points, fill="cyan", width=1,
                                                    dash=(2, 2), smooth=True)
 
-        # Légende
+        # Légende améliorée
         legend_y = 10
         self.visual_canvas.create_text(10, legend_y, anchor="nw",
                                        text=f"Échelle: {scale:.1f}x",
@@ -1146,6 +1276,17 @@ class ConfigEditor:
         self.visual_canvas.create_text(10, legend_y, anchor="nw",
                                        text=f"Cercles: {len(self.config['cercles'])}",
                                        fill="white", font=("Arial", 8))
+
+        # Légende des couleurs
+        legend_y += 25
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text="Légende:", fill="yellow", font=("Arial", 8, "bold"))
+        legend_y += 15
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text="• Trait épais: partie solide", fill="white", font=("Arial", 7))
+        legend_y += 12
+        self.visual_canvas.create_text(10, legend_y, anchor="nw",
+                                       text="• Lignes rouges: ouverture", fill="red", font=("Arial", 7))
 
     # === MÉTHODES DE GESTION DES BALLES ===
 
@@ -1183,6 +1324,11 @@ class ConfigEditor:
             # Décaler légèrement la position
             balle_originale["position"][0] += 20
             balle_originale["position"][1] += 20
+            # S'assurer que les nouveaux coefficients sont présents
+            if "coef_rebondissement" not in balle_originale:
+                balle_originale["coef_rebondissement"] = 0.8
+            if "coef_gravite" not in balle_originale:
+                balle_originale["coef_gravite"] = 1.0
             self.config["balles"].append(balle_originale)
             self.refresh_balles_list()
 
@@ -1232,8 +1378,10 @@ class ConfigEditor:
             balle["vitesse"] = [self.balle_vars['vit_x'].get(), self.balle_vars['vit_y'].get()]
             balle["taille"] = self.balle_vars['taille'].get()
             balle["type_apparence"] = self.balle_vars['type_apparence'].get()
-            balle["coef_rebondissement"] = self.balle_vars['coef_rebondissement'].get()
-            balle["coef_gravite"] = self.balle_vars['coef_gravite'].get()
+
+            # S'assurer que les coefficients sont bien sauvegardés
+            balle["coef_rebondissement"] = float(self.balle_vars['coef_rebondissement'].get())
+            balle["coef_gravite"] = float(self.balle_vars['coef_gravite'].get())
 
             if balle["type_apparence"] == "couleur":
                 balle["couleur"] = self.balle_color_picker.get_color()
@@ -1243,6 +1391,7 @@ class ConfigEditor:
                 balle["couleur"] = [255, 255, 255]  # Couleur par défaut
 
             self.refresh_balles_list()
+            self.refresh_visual_preview()  # Mettre à jour la visualisation
             messagebox.showinfo("Succès", "Modifications sauvegardées !")
 
     def cancel_balle_changes(self):
@@ -1255,6 +1404,10 @@ class ConfigEditor:
         for var_name, var in self.balle_vars.items():
             if isinstance(var, tk.StringVar):
                 var.set("")
+            elif var_name == 'coef_rebondissement':
+                var.set(0.8)
+            elif var_name == 'coef_gravite':
+                var.set(1.0)
             else:
                 var.set(0)
         self.selected_balle_index = None
@@ -1289,7 +1442,7 @@ class ConfigEditor:
             "position": [400, 300],
             "rayon": 80,
             "couleur": [255, 0, 0],
-            "life": 2,
+            "life": 2,  # Valeur par défaut correcte
             "angle_ouverture": 60,
             "angle_rotation_initial": 0,
             "vitesse_rotation": 30
@@ -1312,7 +1465,14 @@ class ConfigEditor:
     def duplicate_cercle(self):
         """Ouvre le dialogue de clonage avancé pour le cercle sélectionné"""
         if self.selected_cercle_index is not None:
+            # IMPORTANT: Sauvegarder d'abord les modifications en cours
+            self.save_cercle_changes()
+
             cercle_original = self.config["cercles"][self.selected_cercle_index]
+
+            # S'assurer que la vie est définie
+            if "life" not in cercle_original:
+                cercle_original["life"] = 2
 
             # Ouvrir le dialogue de clonage
             dialog = CercleCloneDialog(self, cercle_original)
@@ -1321,6 +1481,9 @@ class ConfigEditor:
             # Si des clones ont été créés, les ajouter
             if dialog.result:
                 for clone in dialog.result:
+                    # S'assurer que chaque clone a une vie définie
+                    if "life" not in clone:
+                        clone["life"] = cercle_original.get("life", 2)
                     self.config["cercles"].append(clone)
 
                 self.refresh_cercles_list()
@@ -1363,13 +1526,14 @@ class ConfigEditor:
             cercle = self.config["cercles"][self.selected_cercle_index]
             cercle["position"] = [self.cercle_vars['pos_x'].get(), self.cercle_vars['pos_y'].get()]
             cercle["rayon"] = self.cercle_vars['rayon'].get()
-            cercle["life"] = self.cercle_vars['life'].get()
+            cercle["life"] = int(self.cercle_vars['life'].get())  # S'assurer que c'est un entier
             cercle["couleur"] = self.cercle_color_picker.get_color()
             cercle["angle_ouverture"] = self.cercle_vars['angle_ouverture'].get()
             cercle["angle_rotation_initial"] = self.cercle_vars['angle_rotation_initial'].get()
             cercle["vitesse_rotation"] = self.cercle_vars['vitesse_rotation'].get()
 
             self.refresh_cercles_list()
+            self.refresh_visual_preview()  # Mettre à jour la visualisation
             messagebox.showinfo("Succès", "Modifications sauvegardées !")
 
     def cancel_cercle_changes(self):
@@ -1379,9 +1543,11 @@ class ConfigEditor:
 
     def clear_cercle_fields(self):
         """Vide les champs d'édition de cercle"""
-        for var in self.cercle_vars.values():
+        for var_name, var in self.cercle_vars.items():
             if isinstance(var, tk.StringVar):
                 var.set("")
+            elif var_name == 'life':
+                var.set(2)  # Valeur par défaut pour la vie
             else:
                 var.set(0)
         self.selected_cercle_index = None
@@ -1403,7 +1569,7 @@ class ConfigEditor:
 
     # === MÉTHODES DE GESTION DE L'ÉCRAN ===
 
-    def apply_screen_config(self):
+    def apply_screen_config(self, show_message=True):
         """Applique la configuration de l'écran"""
         self.config["ecran"]["taille"] = [self.screen_vars['largeur'].get(), self.screen_vars['hauteur'].get()]
         self.config["ecran"]["titre"] = self.screen_vars['titre'].get()
@@ -1414,7 +1580,13 @@ class ConfigEditor:
         self.config["ecran"]["debug"] = self.screen_vars['debug'].get()
         self.config["ecran"]["marge_suppression"] = self.screen_vars['marge_suppression'].get()
 
-        messagebox.showinfo("Succès", "Configuration de l'écran appliquée !")
+        if show_message:
+            messagebox.showinfo("Succès", "Configuration de l'écran appliquée !")
+
+    def on_screen_setting_changed(self, *args):
+        """Appelé quand un paramètre d'écran change"""
+        self.apply_screen_config(show_message=False)
+        self.refresh_visual_preview()
 
     # === MÉTHODES DE GESTION DES FICHIERS ===
 
@@ -1541,8 +1713,16 @@ class ConfigEditor:
             # Sauvegarder temporairement la config actuelle
             temp_config_path = os.path.join(self.config_dir, "_temp_config.json")
 
-            # Appliquer d'abord la config de l'écran si elle n'a pas été appliquée
-            self.apply_screen_config()
+            # Appliquer TOUTES les modifications en cours
+            self.apply_screen_config(show_message=False)
+
+            # Appliquer les modifications de balle si une est sélectionnée
+            if self.selected_balle_index is not None:
+                self.save_balle_changes()
+
+            # Appliquer les modifications de cercle si un est sélectionné
+            if self.selected_cercle_index is not None:
+                self.save_cercle_changes()
 
             # Sauvegarder la configuration temporaire
             with open(temp_config_path, 'w', encoding='utf-8') as f:

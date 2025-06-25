@@ -37,7 +37,10 @@ def creer_objets_depuis_config_json(screen, config):
             vitesse=balle_config["vitesse"],
             taille=balle_config["taille"],
             couleur=couleur,
-            image=image
+            image=image,
+            coef_gravite=balle_config.get("coef_gravite", 0.5),
+            coef_collision=balle_config.get("coef_rebondissement", 0.8),
+
         )
         screen.ajouter_objet(balle)
 

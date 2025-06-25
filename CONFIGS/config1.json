@@ -34,8 +34,8 @@
                 255
             ],
             "image": "Bahrain.png",
-            "coef_rebondissement": 0.54,
-            "coef_gravite": 1.68
+            "coef_rebondissement": 0.16,
+            "coef_gravite": 0.31
         },
         {
             "position": [
@@ -54,28 +54,28 @@
                 255
             ],
             "image": "Austria.png",
-            "coef_rebondissement": 0.8,
-            "coef_gravite": 1.0
+            "coef_rebondissement": 0.14,
+            "coef_gravite": 0.46
         },
         {
             "position": [
-                100,
-                100
+                100.0,
+                100.0
             ],
             "vitesse": [
-                150,
-                100
+                150.0,
+                100.0
             ],
-            "taille": 15,
+            "taille": 15.0,
             "type_apparence": "couleur",
             "couleur": [
-                255,
-                255,
-                255
+                214,
+                121,
+                191
             ],
             "image": "",
-            "coef_rebondissement": 0.8,
-            "coef_gravite": 1.0
+            "coef_rebondissement": 0.12,
+            "coef_gravite": 0.2
         }
     ],
     "cercles": [
@@ -86,11 +86,11 @@
             ],
             "rayon": 100.0,
             "couleur": [
-                84,
-                108,
-                222
+                214,
+                121,
+                191
             ],
-            "life": 20,
+            "life": 10,
             "angle_ouverture": 40.0,
             "angle_rotation_initial": 0.0,
             "vitesse_rotation": 30.0
