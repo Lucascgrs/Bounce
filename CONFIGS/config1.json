@@ -90,9 +90,57 @@
                 108,
                 222
             ],
-            "life": 1,
+            "life": 10,
             "angle_ouverture": 60.0,
             "angle_rotation_initial": 0.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 140.0,
+            "couleur": [
+                84,
+                108,
+                222
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 0.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 190.0,
+            "couleur": [
+                152,
+                64,
+                133
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 30.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 240.0,
+            "couleur": [
+                220,
+                21,
+                44
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 60.0,
             "vitesse_rotation": 30.0
         }
     ]

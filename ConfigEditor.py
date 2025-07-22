@@ -261,10 +261,35 @@ class CercleCloneDialog:
             messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde: {e}")
 
     def create_widgets(self):
-        """Crée les widgets du dialogue"""
-        main_frame = ttk.Frame(self.dialog, padding=10)
-        main_frame.pack(fill="both", expand=True)
+        """Crée les widgets du dialogue avec scrollbar"""
+        # Créer un canvas avec scrollbar
+        canvas = tk.Canvas(self.dialog, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.dialog, orient="vertical", command=canvas.yview)
 
+        # Frame scrollable à l'intérieur du canvas
+        main_frame = ttk.Frame(canvas, padding=10)
+
+        # Configurer le canvas pour qu'il défile avec la scrollbar
+        main_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        # Créer une fenêtre dans le canvas qui contient le frame principal
+        canvas_window = canvas.create_window((0, 0), window=main_frame, anchor="nw")
+
+        # Configurer le canvas pour qu'il s'adapte à la largeur
+        def _configure_canvas(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+
+        canvas.bind('<Configure>', _configure_canvas)
+
+        # Positionner le canvas et la scrollbar
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        scrollbar.pack(side="right", fill="y", pady=5)
+
+        # Le reste du code reste identique, mais en utilisant main_frame comme parent
         # Titre
         title_label = tk.Label(main_frame, text="Clonage avancé de cercle",
                                font=("Arial", 14, "bold"))
@@ -315,6 +340,12 @@ class CercleCloneDialog:
         tk.Radiobutton(layout_frame, text="En grille",
                        variable=self.vars['mode_disposition'], value="grille",
                        command=self.update_preview).pack(anchor="w")
+
+        # Option pour cercles concentriques (à ajouter dans la section "Disposition")
+        self.vars['cercles_concentriques'] = tk.BooleanVar(value=True)
+        tk.Checkbutton(layout_frame, text="Cercles concentriques (même centre, rayons différents)",
+                       variable=self.vars['cercles_concentriques'],
+                       command=self.update_preview).pack(anchor="w", pady=(5, 0))
 
         # Décalage de couleur AMÉLIORÉ
         color_frame = ttk.LabelFrame(main_frame, text="Dégradé de couleur", padding=10)
@@ -408,7 +439,9 @@ class CercleCloneDialog:
             # Dessiner l'original
             couleur_orig = self.cercle_original.get("couleur", [255, 0, 0])
             orig_color = f"#{couleur_orig[0]:02x}{couleur_orig[1]:02x}{couleur_orig[2]:02x}"
-            self.preview_canvas.create_oval(cx - 12, cy - 12, cx + 12, cy + 12,
+            rayon_original = 12  # Rayon fixe pour l'aperçu du cercle original
+            self.preview_canvas.create_oval(cx - rayon_original, cy - rayon_original,
+                                            cx + rayon_original, cy + rayon_original,
                                             fill="", outline=orig_color, width=3)
             self.preview_canvas.create_text(cx, cy - 30, text="Original", fill="white", font=("Arial", 9, "bold"))
 
@@ -417,21 +450,35 @@ class CercleCloneDialog:
             distance = self.vars['decalage_distance'].get() * 0.15  # Échelle réduite pour l'aperçu
             rotation = self.vars['decalage_rotation'].get()
 
+            # Vérifier si l'option cercles concentriques est active
+            cercles_concentriques = self.vars.get('cercles_concentriques', tk.BooleanVar(value=True)).get()
+
             for i in range(min(nb_clones, 12)):  # Limiter l'aperçu à 12 cercles
                 if mode == "cercle":
-                    angle = math.radians(rotation * i)
-                    x = cx + distance * math.cos(angle)
-                    y = cy + distance * math.sin(angle)
+                    if cercles_concentriques:
+                        # Mode concentrique: même position, rayon différent
+                        x = cx
+                        y = cy
+                        # Rayon progressivement plus grand
+                        rayon_clone = rayon_original + (i + 1) * (distance * 0.5)
+                    else:
+                        # Mode disposition circulaire: positions différentes
+                        angle = math.radians(rotation * i)
+                        x = cx + distance * math.cos(angle)
+                        y = cy + distance * math.sin(angle)
+                        rayon_clone = 10  # Rayon fixe pour ce mode
                 elif mode == "ligne":
                     angle = math.radians(rotation)
                     x = cx + (distance * (i + 1)) * math.cos(angle)
                     y = cy + (distance * (i + 1)) * math.sin(angle)
+                    rayon_clone = 10
                 else:  # grille
                     cols = int(math.sqrt(nb_clones)) + 1
                     row = i // cols
                     col = i % cols
                     x = cx + col * (distance * 0.8) - (cols * distance * 0.4)
                     y = cy + row * (distance * 0.8) - 30
+                    rayon_clone = 10
 
                 # Calculer la couleur avec dégradé entre couleur source et cible
                 if self.vars['fondu_couleur'].get():
@@ -451,9 +498,11 @@ class CercleCloneDialog:
 
                 # S'assurer que le cercle reste dans le canvas
                 if 20 <= x <= 480 and 20 <= y <= 120:
-                    self.preview_canvas.create_oval(x - 10, y - 10, x + 10, y + 10,
+                    self.preview_canvas.create_oval(x - rayon_clone, y - rayon_clone,
+                                                    x + rayon_clone, y + rayon_clone,
                                                     fill="", outline=color, width=2)
-                    self.preview_canvas.create_text(x, y + 18, text=f"{i + 1}", fill="white", font=("Arial", 8))
+                    self.preview_canvas.create_text(x, y + rayon_clone + 8, text=f"{i + 1}", fill="white",
+                                                    font=("Arial", 8))
 
             # Afficher le nombre total si > 12
             if nb_clones > 12:
@@ -479,10 +528,20 @@ class CercleCloneDialog:
                 clone = copy.deepcopy(self.cercle_original)
 
                 # Calculer la nouvelle position
+                # Calculer la nouvelle position
                 if mode == "cercle":
-                    angle = math.radians(rotation * i)
-                    clone["position"][0] = pos_orig[0] + distance * math.cos(angle)
-                    clone["position"][1] = pos_orig[1] + distance * math.sin(angle)
+                    # Pour des cercles concentriques, conserver la même position centrale
+                    if self.vars.get('cercles_concentriques', tk.BooleanVar(value=True)).get():
+                        # Même position que l'original
+                        clone["position"][0] = pos_orig[0]
+                        clone["position"][1] = pos_orig[1]
+                        # Modifier le rayon en fonction du paramètre de distance
+                        clone["rayon"] = self.cercle_original["rayon"] + (i + 1) * (distance / 2)
+                    else:
+                        # L'ancien comportement (cercles disposés en cercle autour)
+                        angle = math.radians(rotation * i)
+                        clone["position"][0] = pos_orig[0] + distance * math.cos(angle)
+                        clone["position"][1] = pos_orig[1] + distance * math.sin(angle)
                 elif mode == "ligne":
                     angle = math.radians(rotation)
                     clone["position"][0] = pos_orig[0] + (distance * (i + 1)) * math.cos(angle)
