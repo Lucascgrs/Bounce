@@ -13,7 +13,7 @@
         "fps": 200,
         "collision_sur_contact": true,
         "brisure_dans_ouverture": false,
-        "marge_suppression": 300,
+        "marge_suppression": 100,
         "debug": false
     },
     "balles": [
@@ -84,14 +84,14 @@
                 300.0,
                 300.0
             ],
-            "rayon": 100.0,
+            "rayon": 90.0,
             "couleur": [
-                214,
-                121,
-                191
+                84,
+                108,
+                222
             ],
-            "life": 10,
-            "angle_ouverture": 40.0,
+            "life": 1,
+            "angle_ouverture": 60.0,
             "angle_rotation_initial": 0.0,
             "vitesse_rotation": 30.0
         }
