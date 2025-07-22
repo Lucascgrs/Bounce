@@ -4,7 +4,8 @@ import math
 
 
 class Cercle:
-    def __init__(self, position, rayon, couleur="black", epaisseur=2, life=20, angle_ouverture=0, angle_rotation=0, vitesse_rotation=0):
+    def __init__(self, position, rayon, couleur="black", epaisseur=2, life=20, angle_ouverture=0, angle_rotation=0,
+                 vitesse_rotation=0):
         self.position = position
         self.rayon = rayon
         self.couleur = couleur
@@ -17,36 +18,59 @@ class Cercle:
         self.angle_rotation = angle_rotation  # Angle de rotation actuel en degrés
         self.vitesse_rotation = vitesse_rotation  # Vitesse de rotation en degrés/seconde
 
+        # Attributs pour le prérendu
+        self.surface_prerendue = None
+        self.rect_surface = None
+        self.derniers_params = {}
+        self.derniere_life_ratio = -1  # Pour détecter les changements de couleur basés sur life
+
     def mettre_a_jour(self, dt):
         """Met à jour la rotation de l'arc"""
+        rotation_modifiee = False
+
         if self.vitesse_rotation != 0:
             self.angle_rotation += self.vitesse_rotation * dt
             self.angle_rotation = self.angle_rotation % 360  # Garder l'angle entre 0 et 360
+            rotation_modifiee = True
+
+        # Si la rotation a changé, il faut recréer la surface prérendue
+        if rotation_modifiee and self.surface_prerendue is not None:
+            # On indique que la surface doit être recréée en la mettant à None
+            self.surface_prerendue = None
 
     def est_dans_ouverture(self, position_balle, rayon_balle=0):
         """Vérifie si une balle est entièrement dans l'ouverture (partie invisible) de l'arc"""
+        # Méthode inchangée - déjà robuste avec les divisions par zéro
+        # [code existant inchangé]
         if self.angle_ouverture == 0:
             return False  # Pas d'ouverture pour un cercle complet
 
-        # Calculer l'angle du centre de la balle par rapport au centre de l'arc
+        # Vecteur du centre du cercle au point
         dx = position_balle[0] - self.position[0]
         dy = position_balle[1] - self.position[1]
+
+        # Éviter la division par zéro
+        if abs(dx) < 0.0001 and abs(dy) < 0.0001:
+            return False  # Balle au centre du cercle = pas entièrement dans l'ouverture
+
         distance_centre = math.sqrt(dx * dx + dy * dy)
 
-        if distance_centre == 0:
-            return False
-
+        # Calculer l'angle du centre de la balle
         angle_centre_balle = math.degrees(math.atan2(dy, dx))
         angle_centre_balle = (angle_centre_balle + 360) % 360
 
         # Calculer l'angle que couvre la balle depuis le centre du cercle
-        if rayon_balle > 0 and distance_centre > 0:
-            # Angle que couvre le rayon de la balle vu depuis le centre du cercle
-            angle_couverture_balle = math.degrees(math.asin(min(1.0, rayon_balle / distance_centre)))
+        # Avec gestion du cas où distance_centre est très petite
+        if rayon_balle > 0 and distance_centre > rayon_balle:
+            # Sinus limité à 1.0 pour éviter les erreurs numériques
+            sin_value = min(1.0, rayon_balle / max(0.0001, distance_centre))
+            angle_couverture_balle = math.degrees(math.asin(sin_value))
         else:
-            angle_couverture_balle = 0
+            # Si la balle est très proche du centre ou plus grande que la distance
+            # On considère un angle large pour être sûr
+            angle_couverture_balle = 90.0
 
-        # Calculer les angles de début et fin de l'ouverture (partie invisible)
+        # Calculer les angles de l'ouverture
         angle_ouverture_debut = (self.angle_rotation - self.angle_ouverture / 2) % 360
         angle_ouverture_fin = (self.angle_rotation + self.angle_ouverture / 2) % 360
 
@@ -64,11 +88,9 @@ class Cercle:
         # Vérifier si TOUTE la balle est dans l'ouverture
         if angle_balle_min <= angle_balle_max:
             # Cas normal : la balle ne traverse pas 0°
-            # Pour que toute la balle soit dans l'ouverture, les deux extrêmes doivent y être
             return angle_dans_ouverture(angle_balle_min) and angle_dans_ouverture(angle_balle_max)
         else:
             # Cas où la balle traverse 0° : vérifier que tout l'arc couvert est dans l'ouverture
-            # On vérifie plusieurs points sur l'arc de la balle
             points_a_verifier = 5
             for i in range(points_a_verifier + 1):
                 if i == 0:
@@ -78,13 +100,27 @@ class Cercle:
                 else:
                     # Points intermédiaires en traversant 0°
                     angle_test = (angle_balle_min + (
-                                360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
+                            360 + angle_balle_max - angle_balle_min) * i / points_a_verifier) % 360
 
                 if not angle_dans_ouverture(angle_test):
                     return False
             return True
 
-    def afficher(self, surface):
+    def a_change(self):
+        """Vérifie si le cercle a changé depuis le dernier prérendu"""
+        # Calculer le ratio actuel de vie
+        ratio = max(0, min(1, self.life / self.life_max))
+
+        # Vérifier si l'un des paramètres a changé
+        return (not self.derniers_params or
+                self.derniers_params['rayon'] != self.rayon or
+                self.derniers_params['epaisseur'] != self.epaisseur or
+                self.derniers_params['angle_rotation'] != self.angle_rotation or
+                self.derniers_params['angle_ouverture'] != self.angle_ouverture or
+                abs(self.derniere_life_ratio - ratio) > 0.05)  # 5% de changement de couleur
+
+    def creer_surface_prerendue(self):
+        """Crée une surface prérendue pour ce cercle"""
         # Calcul de la proportion de vie restante (entre 0 et 1)
         ratio = max(0, min(1, self.life / self.life_max))
 
@@ -111,8 +147,11 @@ class Cercle:
             # Réduction de la surface pour un effet lissé
             cercle_lisse = pygame.transform.smoothscale(temp_surface, (self.rayon * 2, self.rayon * 2))
 
-            # Affichage du cercle sur la surface principale
-            surface.blit(cercle_lisse, (self.position[0] - self.rayon, self.position[1] - self.rayon))
+            # Stocker comme surface prérendue
+            self.surface_prerendue = cercle_lisse
+            self.rect_surface = self.surface_prerendue.get_rect(
+                center=(self.position[0], self.position[1])
+            )
         else:
             # Dessiner un arc (la partie visible = 360° - angle_ouverture)
             angle_visible = 360 - self.angle_ouverture
@@ -154,10 +193,35 @@ class Cercle:
                 points = [(x1_ext, y1_ext), (x2_ext, y2_ext), (x2_int, y2_int), (x1_int, y1_int)]
                 pygame.draw.polygon(temp_surface, (*couleur, 255), points)
 
-            # Réduire et afficher
+            # Réduire et stocker
             arc_lisse = pygame.transform.smoothscale(temp_surface,
                                                      (self.rayon * 2 + self.epaisseur * 2,
                                                       self.rayon * 2 + self.epaisseur * 2))
 
-            surface.blit(arc_lisse, (self.position[0] - self.rayon - self.epaisseur,
-                                     self.position[1] - self.rayon - self.epaisseur))
+            # Stocker comme surface prérendue
+            self.surface_prerendue = arc_lisse
+            self.rect_surface = self.surface_prerendue.get_rect(
+                center=(self.position[0], self.position[1])
+            )
+
+        # Mémoriser les paramètres utilisés pour ce rendu
+        self.derniers_params = {
+            'rayon': self.rayon,
+            'epaisseur': self.epaisseur,
+            'angle_rotation': self.angle_rotation,
+            'angle_ouverture': self.angle_ouverture,
+        }
+        self.derniere_life_ratio = ratio
+
+    def afficher(self, surface):
+        """Affiche le cercle sur la surface, en utilisant la surface prérendue si possible"""
+        # Si la surface prérendue n'existe pas ou si le cercle a changé, recréer la surface
+        if self.surface_prerendue is None or self.a_change():
+            self.creer_surface_prerendue()
+
+        # Afficher la surface prérendue
+        if self.angle_ouverture == 0:
+            surface.blit(self.surface_prerendue, (self.position[0] - self.rayon, self.position[1] - self.rayon))
+        else:
+            surface.blit(self.surface_prerendue, (self.position[0] - self.rayon - self.epaisseur,
+                                                  self.position[1] - self.rayon - self.epaisseur))

@@ -5,6 +5,7 @@ from Cercle import Cercle
 from Particule import Particule, StyleExplosion
 import random
 import math
+from Quadtree import Quadtree, Rectangle
 
 
 class Screen:
@@ -22,6 +23,7 @@ class Screen:
         self.en_cours = True
         self.marge_suppression = marge_suppression
         self.debug = debug
+        self.quadtree = None
 
         # Paramètres de collision globaux
         self.collision_sur_contact = collision_sur_contact
@@ -103,9 +105,7 @@ class Screen:
                 self.log_debug(f"{objets_retires} objets retirés de l'écran")
 
             # Gestion des collisions entre balles
-            for i in range(len(balles)):
-                for j in range(i + 1, len(balles)):
-                    balles[i].collision_avec_balle(balles[j])
+            self.check_collisions()
 
             # Gestion des collisions balle-cercle avec nouvelle logique
             for balle in balles:
@@ -140,6 +140,36 @@ class Screen:
             pygame.display.flip()
 
         pygame.quit()
+
+    def check_collisions(self):
+        """Vérifie les collisions entre balles en utilisant Quadtree"""
+        # Récupérer uniquement les balles
+        balles = [obj for obj in self.objets if isinstance(obj, Balle)]
+
+        # Créer un nouveau Quadtree à chaque frame
+        # +100 pour inclure les objets légèrement hors écran
+        boundary = Rectangle(-100, -100,
+                             self.taille[0] + 200,
+                             self.taille[1] + 200)
+        self.quadtree = Quadtree(boundary)
+
+        # Insérer toutes les balles dans le Quadtree avec leur indice
+        for i, balle in enumerate(balles):
+            self.quadtree.insert(balle.position, (i, balle))
+
+        # Vérifier les collisions pour chaque balle
+        for i, balle in enumerate(balles):
+            # Créer une zone de recherche autour de la balle
+            radius = balle.taille * 2  # Rayon de recherche (2x taille pour être sûr)
+
+            # Trouver les balles potentiellement en collision
+            potential_collisions = self.quadtree.query_radius(balle.position, radius)
+
+            # Vérifier uniquement ces collisions
+            for _, data in potential_collisions:
+                j, other_balle = data
+                if i < j:  # Éviter de vérifier deux fois la même paire
+                    balle.collision_avec_balle(other_balle)
 
     def _est_entierement_dans_ouverture(self, balle, cercle):
         """Vérifie si TOUTE la balle est dans l'ouverture"""

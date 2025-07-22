@@ -74,52 +74,86 @@ class Balle:
             distance_mouvement = ((self.position[0] - old_position[0]) ** 2 + (self.position[1] - old_position[1]) ** 2) ** 0.5
 
     def collision_avec_balle(self, autre_balle):
-        # LOG: Position avant collision
-        old_position = self.position.copy()
+        """Gère la collision avec une autre balle de façon stable"""
+        import numpy as np
 
-        # Calcul de la distance entre les centres des balles
-        dx = autre_balle.position[0] - self.position[0]
-        dy = autre_balle.position[1] - self.position[1]
-        distance = np.sqrt(dx * dx + dy * dy)
+        # Vecteur de distance entre les centres des balles
+        delta_position = np.array([
+            autre_balle.position[0] - self.position[0],
+            autre_balle.position[1] - self.position[1]
+        ])
+
+        # Distance entre les centres
+        distance_squared = delta_position[0] ** 2 + delta_position[1] ** 2
+        somme_rayons = self.taille + autre_balle.taille
+
+        # Test rapide: si les balles sont trop éloignées, sortir immédiatement
+        if distance_squared > somme_rayons ** 2:
+            return False
+
+        # Éviter division par zéro
+        if distance_squared < 0.0001:  # Presque parfaitement superposées
+            # Générer une direction aléatoire pour séparer les balles
+            import random
+            angle = random.uniform(0, 2 * np.pi)
+            delta_position = np.array([np.cos(angle), np.sin(angle)])
+            distance = 0.01  # Petite valeur non-nulle
+        else:
+            distance = np.sqrt(distance_squared)
+
+        # Normaliser le vecteur de direction
+        direction = delta_position / distance
+
+        # Calcul du chevauchement
+        overlap = somme_rayons - distance
 
         # Si collision
-        if distance < (self.taille + autre_balle.taille):
-            # Éviter la division par zéro
-            if distance == 0:
-                distance = 0.001
+        if overlap > 0:
+            # Vecteur vitesse relative
+            delta_v = np.array([
+                autre_balle.vitesse[0] - self.vitesse[0],
+                autre_balle.vitesse[1] - self.vitesse[1]
+            ])
 
-            # Normalisation du vecteur de collision
-            nx = dx / distance
-            ny = dy / distance
+            # Produit scalaire pour déterminer si les balles s'approchent
+            vitesse_relative_selon_direction = np.dot(delta_v, direction)
 
-            # Calcul du vecteur tangent
-            tx = -ny
-            ty = nx
+            # Ne traiter la collision que si les balles s'approchent
+            if vitesse_relative_selon_direction < 0:
+                # Masse des balles (proportionnelle au volume)
+                m1 = self.taille ** 3
+                m2 = autre_balle.taille ** 3
+                total_mass = m1 + m2
 
-            # Calcul des vitesses normales
-            v1n = self.vitesse[0] * nx + self.vitesse[1] * ny
-            v2n = autre_balle.vitesse[0] * nx + autre_balle.vitesse[1] * ny
+                # Éviter division par zéro si les masses sont trop faibles
+                if total_mass < 0.0001:
+                    total_mass = 0.0001
 
-            # Calcul des vitesses tangentielles (conservées)
-            v1t = self.vitesse[0] * tx + self.vitesse[1] * ty
-            v2t = autre_balle.vitesse[0] * tx + autre_balle.vitesse[1] * ty
+                # Calculer les impulsions
+                j = -(1 + 0.8) * vitesse_relative_selon_direction
+                j /= (1 / m1 + 1 / m2)
 
-            # Calcul des nouvelles vitesses normales avec coefficient de restitution
-            v1n_new = v2n * self.coef_collision
-            v2n_new = v1n * autre_balle.coef_collision
+                # Appliquer les forces
+                impulsion = j * direction
 
-            # Reconstitution des vecteurs vitesse
-            self.vitesse[0] = v1n_new * nx + v1t * tx
-            self.vitesse[1] = v1n_new * ny + v1t * ty
-            autre_balle.vitesse[0] = v2n_new * nx + v2t * tx
-            autre_balle.vitesse[1] = v2n_new * ny + v2t * ty
+                # Calculer les nouvelles vitesses
+                nouvelle_vitesse1 = np.array(self.vitesse) - (impulsion / m1)
+                nouvelle_vitesse2 = np.array(autre_balle.vitesse) + (impulsion / m2)
 
-            # Correction de la position pour éviter les chevauchements
-            recouvrement = (self.taille + autre_balle.taille - distance) / 2
-            self.position[0] -= recouvrement * nx
-            self.position[1] -= recouvrement * ny
-            autre_balle.position[0] += recouvrement * nx
-            autre_balle.position[1] += recouvrement * ny
+                # Correction de position pour éviter superposition
+                correction = (overlap / 2) * direction
+                self.position[0] -= correction[0]
+                self.position[1] -= correction[1]
+                autre_balle.position[0] += correction[0]
+                autre_balle.position[1] += correction[1]
+
+                # Mise à jour des vitesses
+                self.vitesse = nouvelle_vitesse1.tolist()
+                autre_balle.vitesse = nouvelle_vitesse2.tolist()
+
+                return True
+
+        return False
 
     def afficher(self, surface):
         # Position pour le blit (coin supérieur gauche)
