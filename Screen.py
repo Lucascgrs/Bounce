@@ -6,6 +6,7 @@ from Particule import Particule, StyleExplosion
 import random
 import math
 from Quadtree import Quadtree, Rectangle
+from SurfaceManager import SurfaceManager
 
 
 class Screen:
@@ -29,17 +30,72 @@ class Screen:
         self.collision_sur_contact = collision_sur_contact
         self.brisure_dans_ouverture = brisure_dans_ouverture
 
+        # Surface pour les éléments statiques
+        self.static_surface = pygame.Surface(taille, pygame.SRCALPHA)
+        self.static_surface.fill((0, 0, 0, 0))
+        self.static_objects = []  # Liste des objets statiques
+        self.static_dirty = True  # Si True, il faut redessiner les éléments statiques
+
+        # Compteur pour les opérations périodiques
+        self.frame_counter = 0
+
+        # Gestionnaire de surfaces
+        self.surface_manager = SurfaceManager.get_instance()
+
     def log_debug(self, message):
         """Affiche les messages de debug si activé"""
         if self.debug:
             print(f"[DEBUG] {message}")
 
+    def est_statique(self, obj):
+        """Détermine si un objet est statique ou dynamique"""
+        if isinstance(obj, Balle):
+            return False  # Les balles sont toujours dynamiques
+        elif isinstance(obj, Cercle):
+            # Un cercle est statique s'il ne tourne pas et si sa durée de vie est assez longue
+            return obj.vitesse_rotation == 0 and obj.life > 1
+        return False
+
+    def categoriser_objets(self):
+        """Catégorise les objets en statiques et dynamiques"""
+        self.static_objects = []
+        for obj in self.objets:
+            if self.est_statique(obj):
+                self.static_objects.append(obj)
+
+        self.static_dirty = True  # Marquer pour redessiner
+        self.log_debug(
+            f"Objets catégorisés: {len(self.static_objects)} statiques, {len(self.objets) - len(self.static_objects)} dynamiques")
+
+    def mettre_a_jour_surface_statique(self):
+        """Met à jour la surface contenant tous les éléments statiques"""
+        if self.static_dirty and self.static_objects:
+            self.log_debug("Mise à jour de la surface statique")
+            self.static_surface.fill((0, 0, 0, 0))  # Transparent
+
+            # Dessiner tous les objets statiques
+            for obj in self.static_objects:
+                obj.afficher(self.static_surface)
+
+            self.static_dirty = False
+
     def ajouter_objet(self, objet):
+        """Ajoute un objet et le catégorise"""
         self.objets.append(objet)
 
+        # Si c'est un objet statique, l'ajouter à la liste correspondante
+        if self.est_statique(objet):
+            self.static_objects.append(objet)
+            self.static_dirty = True
+
     def retirer_objet(self, objet):
+        """Retire un objet des listes"""
         if objet in self.objets:
             self.objets.remove(objet)
+
+        if objet in self.static_objects:
+            self.static_objects.remove(objet)
+            self.static_dirty = True
 
     def retirer_objets_hors_ecran(self):
         """Retire les objets qui sont sortis de l'écran avec une marge"""
@@ -75,8 +131,12 @@ class Screen:
         import time
         debut = time.time()
 
+        # Catégorisation initiale des objets
+        self.categoriser_objets()
+
         while self.en_cours:
             dt = self.horloge.tick(fps) / 1000.0
+            self.frame_counter += 1
 
             # Gestion des événements
             for event in pygame.event.get():
@@ -99,6 +159,15 @@ class Screen:
                 if hasattr(obj, 'mettre_a_jour'):
                     obj.mettre_a_jour(dt)
 
+                    # Si un objet statique a été modifié (ex: cercle qui a perdu de la vie)
+                    if obj in self.static_objects and isinstance(obj, Cercle):
+                        if obj.a_change():
+                            self.static_dirty = True
+
+            # Recatégorisation périodique (toutes les 60 frames)
+            if self.frame_counter % 60 == 0:
+                self.categoriser_objets()
+
             # Retirer les objets hors écran
             objets_retires = self.retirer_objets_hors_ecran()
             if objets_retires > 0:
@@ -116,14 +185,21 @@ class Screen:
                         self.log_debug(f"Cercle détruit! Création d'explosion à {collision_point}")
                         self._creer_explosion(cercle, collision_point)
                         # Suppression du cercle
-                        if cercle in self.objets:
-                            self.objets.remove(cercle)
+                        self.retirer_objet(cercle)
                         if cercle in cercles:
                             cercles.remove(cercle)
 
-            # Affichage des objets
+            # Mettre à jour la surface statique si nécessaire
+            self.mettre_a_jour_surface_statique()
+
+            # Afficher la surface statique (objets qui ne changent pas)
+            if self.static_objects:
+                self.ecran.blit(self.static_surface, (0, 0))
+
+            # Afficher uniquement les objets dynamiques (qui ne sont pas dans la liste statique)
             for obj in self.objets:
-                obj.afficher(self.ecran)
+                if obj not in self.static_objects:
+                    obj.afficher(self.ecran)
 
             # Mise à jour et affichage des particules
             for particule in self.particules[:]:
@@ -138,6 +214,10 @@ class Screen:
 
             # Mise à jour de l'affichage
             pygame.display.flip()
+
+            # Nettoyage périodique des surfaces temporaires (toutes les 300 frames)
+            if self.frame_counter % 300 == 0:
+                self.surface_manager.cleanup()
 
         pygame.quit()
 

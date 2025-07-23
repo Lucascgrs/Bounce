@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import pygame
 import numpy as np
+from SurfaceManager import SurfaceManager
 
 
 class Balle:
-    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0), coef_gravite=0.5, coef_collision=0.8):
+    def __init__(self, taille, image=None, couleur="red", contour=None, position=(100, 100), vitesse=(0, 0),
+                 coef_gravite=0.5, coef_collision=0.8):
         self.taille = taille
         self.image_path = image
         self.couleur = couleur
@@ -18,46 +20,56 @@ class Balle:
         # Compteur pour les logs
         self.log_counter = 0
 
+        # Référence au gestionnaire de surfaces
+        self.surface_manager = SurfaceManager.get_instance()
+
+        # Image préchargée
+        self.image = None
+
         if self.image_path:
-            try:
-                # Charger l'image originale
-                original_image = pygame.image.load(self.image_path)
+            self._prepare_image()
 
-                # Convertir l'image en format 32-bit RGBA
-                original_image = original_image.convert_alpha()
+    def _prepare_image(self):
+        """Charge et prépare l'image de la balle en utilisant le cache"""
+        try:
+            # Charger l'image originale
+            original_image = self.surface_manager.get_image(self.image_path)
+            if original_image is None:
+                return
 
-                # Créer une surface circulaire avec canal alpha
-                self.image = pygame.Surface((taille * 2, taille * 2), pygame.SRCALPHA)
+            # Créer une surface circulaire avec canal alpha
+            self.image = pygame.Surface((self.taille * 2, self.taille * 2), pygame.SRCALPHA)
 
-                # Redimensionner l'image originale
-                scaled_size = int(taille * 2.1)  # 5% plus grand
-                try:
-                    # Essayer d'abord smoothscale
-                    scaled_image = pygame.transform.smoothscale(original_image, (scaled_size, scaled_size))
-                except ValueError:
-                    # Si smoothscale échoue, utiliser scale normal
-                    scaled_image = pygame.transform.scale(original_image, (scaled_size, scaled_size))
+            # Redimensionner l'image originale
+            scaled_size = int(self.taille * 2.1)  # 5% plus grand
+            scaled_image = self.surface_manager.get_scaled_image(self.image_path, (scaled_size, scaled_size))
+            if scaled_image is None:
+                return
 
-                # Créer un masque circulaire
-                mask_surface = pygame.Surface((taille * 2, taille * 2), pygame.SRCALPHA)
-                pygame.draw.circle(mask_surface, (255, 255, 255, 255), (taille, taille), taille)
+            # Créer un masque circulaire (réutilisable)
+            mask_key = f"mask_{int(self.taille * 2)}"
+            if mask_key in self.surface_manager.circle_cache:
+                mask_surface = self.surface_manager.circle_cache[mask_key]
+            else:
+                mask_surface = pygame.Surface((self.taille * 2, self.taille * 2), pygame.SRCALPHA)
+                pygame.draw.circle(mask_surface, (255, 255, 255, 255), (self.taille, self.taille), self.taille)
+                self.surface_manager.circle_cache[mask_key] = mask_surface
 
-                # Découper l'image en cercle
-                self.image.fill((0, 0, 0, 0))  # Remplir avec du transparent
-                self.image.blit(scaled_image,
-                                ((taille * 2 - scaled_size) // 2,
-                                 (taille * 2 - scaled_size) // 2))
+            # Découper l'image en cercle
+            self.image.fill((0, 0, 0, 0))  # Remplir avec du transparent
+            self.image.blit(scaled_image,
+                            ((self.taille * 2 - scaled_size) // 2,
+                             (self.taille * 2 - scaled_size) // 2))
 
-                # Appliquer le masque
-                self.image.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            # Appliquer le masque
+            self.image.blit(mask_surface, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
 
-            except Exception as e:
-                print(f"Erreur lors du chargement de l'image: {self.image_path}")
-                print(f"Détail de l'erreur: {e}")
-                self.image = None
-        else:
+        except Exception as e:
+            print(f"Erreur lors de la préparation de l'image: {self.image_path}")
+            print(f"Détail de l'erreur: {e}")
             self.image = None
 
+    # Le reste des méthodes restent inchangées
     def mettre_a_jour(self, dt):
         # LOG: Position avant mise à jour
         old_position = self.position.copy()
@@ -71,7 +83,8 @@ class Balle:
         # LOG: Détecter les changements brusques de position
         self.log_counter += 1
         if self.log_counter % 120 == 0:  # Toutes les 2 secondes à 60 FPS
-            distance_mouvement = ((self.position[0] - old_position[0]) ** 2 + (self.position[1] - old_position[1]) ** 2) ** 0.5
+            distance_mouvement = ((self.position[0] - old_position[0]) ** 2 + (
+                        self.position[1] - old_position[1]) ** 2) ** 0.5
 
     def collision_avec_balle(self, autre_balle):
         """Gère la collision avec une autre balle de façon stable"""
@@ -156,19 +169,22 @@ class Balle:
         return False
 
     def afficher(self, surface):
+        """Affiche la balle avec réutilisation des surfaces"""
         # Position pour le blit (coin supérieur gauche)
         pos_x = int(self.position[0] - self.taille)
         pos_y = int(self.position[1] - self.taille)
 
         if self.image:
-            # Afficher l'image circulaire
+            # Utiliser l'image préparée
             surface.blit(self.image, (pos_x, pos_y))
 
             # Dessiner la bordure si spécifiée
             if self.contour:
-                pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])), self.taille, self.contour[1])
+                pygame.draw.circle(surface, self.contour[0],
+                                   (int(self.position[0]), int(self.position[1])),
+                                   self.taille, self.contour[1])
         else:
-            # Dessiner un cercle si pas d'image
-            pygame.draw.circle(surface, self.couleur, (int(self.position[0]), int(self.position[1])), self.taille)
-            if self.contour:
-                pygame.draw.circle(surface, self.contour[0], (int(self.position[0]), int(self.position[1])), self.taille, self.contour[1])
+            # Utiliser une surface de cercle en cache
+            circle_surface = self.surface_manager.get_circle_surface(
+                self.taille, self.couleur, self.contour)
+            surface.blit(circle_surface, (pos_x, pos_y))
