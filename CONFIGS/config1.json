@@ -86,9 +86,9 @@
             ],
             "rayon": 90.0,
             "couleur": [
-                84,
-                108,
-                222
+                0,
+                123,
+                0
             ],
             "life": 10,
             "angle_ouverture": 60.0,
@@ -100,11 +100,11 @@
                 300.0,
                 300.0
             ],
-            "rayon": 140.0,
+            "rayon": 105.0,
             "couleur": [
-                84,
-                108,
-                222
+                0,
+                123,
+                0
             ],
             "life": 10,
             "angle_ouverture": 60.0,
@@ -116,11 +116,91 @@
                 300.0,
                 300.0
             ],
-            "rayon": 190.0,
+            "rayon": 120.0,
             "couleur": [
-                152,
-                64,
-                133
+                22,
+                112,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 5.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 135.0,
+            "couleur": [
+                45,
+                101,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 10.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 150.0,
+            "couleur": [
+                68,
+                90,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 15.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 165.0,
+            "couleur": [
+                90,
+                79,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 20.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 180.0,
+            "couleur": [
+                113,
+                68,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 25.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 195.0,
+            "couleur": [
+                136,
+                57,
+                0
             ],
             "life": 10,
             "angle_ouverture": 60.0,
@@ -132,15 +212,47 @@
                 300.0,
                 300.0
             ],
-            "rayon": 240.0,
+            "rayon": 210.0,
             "couleur": [
-                220,
-                21,
-                44
+                158,
+                46,
+                0
             ],
             "life": 10,
             "angle_ouverture": 60.0,
-            "angle_rotation_initial": 60.0,
+            "angle_rotation_initial": 35.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 225.0,
+            "couleur": [
+                181,
+                35,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 40.0,
+            "vitesse_rotation": 30.0
+        },
+        {
+            "position": [
+                300.0,
+                300.0
+            ],
+            "rayon": 240.0,
+            "couleur": [
+                204,
+                24,
+                0
+            ],
+            "life": 10,
+            "angle_ouverture": 60.0,
+            "angle_rotation_initial": 45.0,
             "vitesse_rotation": 30.0
         }
     ]
